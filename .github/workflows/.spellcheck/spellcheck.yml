@@ -26,8 +26,8 @@ matrix:
       - open: '(?P<open>\]\()'
         close: '(.*\))$'
       # Ignore html tags <>
-      - open: '(?P<open>\<)'
-        close: '(.*\>)$'
+      - open: '(?P<open><)'
+        close: '(.*\/>)$'
   sources:
   - '**/*.md'
   default_encoding: utf-8
