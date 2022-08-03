@@ -4,7 +4,6 @@ uVxWorks
 VSB
 vxprj
 VxSim
-vxWorks
-VxWorks
+[vV]x[wW]orks
 wrdbg
 wrtool
