@@ -1,0 +1,7 @@
+bitbucket
+github
+hg
+LTS
+NCLA
+SDK
+SDKs

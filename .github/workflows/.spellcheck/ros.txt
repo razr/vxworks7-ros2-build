@@ -1,4 +1,6 @@
 colcon
+Diademata
+Eigen
 micro-ROS
 ROS
 ros
