@@ -65,6 +65,10 @@ ifneq (,$(findstring termios.c,$(SOURCES)))
 	install -m 644 termios.h $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
 	install -m 644 sys/ttycom.h $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)/sys
 endif
+ifneq (,$(findstring flock.c,$(SOURCES)))
+	install -d $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)/sys
+	install -m 644 sys/file.h $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)/sys
+endif
 	install -d $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
 	install -m 755 $(TARGET).a $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
 	install -m 755 $(TARGET).so $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
