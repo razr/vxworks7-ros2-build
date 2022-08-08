@@ -29,7 +29,7 @@ or any other method.
 Change directories to vxbuild directory where this README.md is found.
 
 ```
-sudo docker build -t vxbuild:1.0 .
+sudo docker build -t vxbuild:22.04 .
 ```
 
 NOTE: If building on Windows please use --config core.autocrlf=input to
@@ -48,7 +48,7 @@ the vxbuild container is:
 ```
 sudo docker run --rm -v $INSTALL_DIR:/opt/windriver \
     -v $LM_LICENSE_FILE:/opt/windriver/license/zwrsLicense.lic \
-    -v $WORK_DIR:/work vxbuild:1.0 /work/myscript.sh
+    -v $WORK_DIR:/work vxbuild:22.04 /work/myscript.sh
 ```
 
 If you add the -it option to the docker run command, then vxbuild will automatically start an
@@ -56,7 +56,7 @@ interactive bash shell.  This is ideal for development or debugging problems tha
 ```
 sudo docker run -it --rm -v $INSTALL_DIR:/opt/windriver \
     -v $LM_LICENSE_FILE:/opt/windriver/license/zwrsLicense.lic \
-    -v $WORK_DIR:/work vxbuild:1.0
+    -v $WORK_DIR:/work vxbuild:22.04
 ```
 
 ## Use Case A: Using a Docker volume
@@ -67,7 +67,7 @@ For a volume named vxinstall with a script named vxexample.sh, use the following
 ```
 sudo docker run --rm -v vxinstall:/opt/windriver \
     -v $PWD/encryptedLicense_201932382441440206_s.lic:/opt/windriver/license/zwrsLicense.lic \
-    -v $PWD:/work vxbuild:1.0 /work/vxexample.sh
+    -v $PWD:/work vxbuild:22.04 /work/vxexample.sh
 ```
 
 If you want to run the script again, you will need to remove the projects in the workspace
@@ -76,7 +76,7 @@ directory.  You may use the interactive mode to do this:
 ```
 sudo docker run -it --rm -v vxinstall:/opt/windriver \
     -v $PWD/encryptedLicense_201932382441440206_s.lic:/opt/windriver/license/zwrsLicense.lic \
-    -v $PWD:/work vxbuild:1.0
+    -v $PWD:/work vxbuild:22.04
 ```
 
 Then at the bash prompt you may simply delete the workspace directory to start over.
@@ -92,7 +92,7 @@ Bind mount /opt/windriver into the Docker container
 ```
 sudo docker run --rm -v /opt/windriver:/opt/windriver \
     -v $PWD/encryptedLicense_201932382441440206_s.lic:/opt/windriver/license/zwrsLicense.lic \
-    -v $PWD:/work vxbuild:1.0 /work/vxexample.sh
+    -v $PWD:/work vxbuild:22.04 /work/vxexample.sh
 ```
 
 You may set environment variables to use a custom user id or installation directory that matches
@@ -104,7 +104,7 @@ sudo docker run --rm -v $HOME/windriver:$HOME/windriver \
     -e UID=$(id -u $MYUSER) \
     -e GID=$(id -g $MYGROUP) \
     -e INSTALL_DIR=$HOME/windriver \
-    -v $PWD:/work vxbuild:1.0 /work/vxexample.sh
+    -v $PWD:/work vxbuild:22.04 /work/vxexample.sh
 ```
 
 ## Use Case C: Skip Docker entirely

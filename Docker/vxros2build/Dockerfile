@@ -1,7 +1,7 @@
-FROM vxbuild:1.0
+FROM vxbuild:22.04
 
 # Environment variables
-ENV ROS_DISTRO dashing
+ENV ROS_DISTRO humble
 ENV ROS2_WS /opt/ros2_ws
 ## Let the script create the workspace
 ## ENV PRJ_WS_NAME ${BSP}_${BOARD}_${PRJ}_ws
@@ -51,7 +51,6 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
     libxrandr-dev \
     python3-sip-dev \
     python3-pyqt5 \
-    python3-lark-parser \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages
