@@ -89,6 +89,8 @@ RUN apt-get update && apt-get install --no-install-recommends -y \
 
 # For native ROS2 builds
 RUN apt-get update && apt-get install --no-install-recommends -y \
+    libacl1-dev \
+    libncurses5-dev \
     libasio-dev \
     libtinyxml2-dev \
     libeigen3-dev \
