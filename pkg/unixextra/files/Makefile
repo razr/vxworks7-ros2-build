@@ -27,6 +27,7 @@ TARGET = libunixextra
 SOURCES := $(wildcard *.c)
 OBJECTS := $(SOURCES:.c=.o)
 SHOBJECTS := $(SOURCES:.c=.sho)
+TESTS := $(patsubst %.c,%,$(wildcard tests/*.c))
 
 PREFIX ?= /usr/local
 INCLUDE_PATH ?= include
@@ -34,7 +35,7 @@ LIBRARY_PATH ?= lib
 
 CC_FLAGS ?= -g
 
-all: $(TARGET).a $(TARGET).so
+all: $(TARGET).a $(TARGET).so $(TESTS)
 
 $(TARGET).so: $(SHOBJECTS)
 	$(CC) -shared $^ -o $@ $(CC_FLAGS)
@@ -48,8 +49,11 @@ $(TARGET).a: $(OBJECTS)
 %.o: %.c
 	$(CC) -static -c $< -o $@ -I. $(CC_FLAGS)
 
+$(TESTS): %: %.c
+	$(CC) -static -o $@ $< $(CC_FLAGS)
+
 clean:
-	@rm -rf *.o *.sho $(TARGET).*
+	@rm -rf *.o *.sho $(TARGET).* $(TESTS)
 
 install: $(TARGET).a $(TARGET).so
 ifneq (,$(findstring fnmatch.c,$(SOURCES)))
@@ -68,6 +72,10 @@ endif
 ifneq (,$(findstring flock.c,$(SOURCES)))
 	install -d $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)/sys
 	install -m 644 sys/file.h $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)/sys
+endif
+ifneq (,$(findstring pthread_getname.c,$(SOURCES)))
+	install -d $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
+	install -m 644 pthread.h $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
 endif
 	install -d $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
 	install -m 755 $(TARGET).a $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
