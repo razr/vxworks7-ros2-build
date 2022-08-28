@@ -21,43 +21,29 @@
 
 # SYNOPSIS        variables for ROS2 packages
 
-ROS2_PATCH_DIRS=eProsima/Fast-CDR \
-                eProsima/Fast-RTPS \
-                ros/class_loader \
-                ros2/console_bridge_vendor \
-                ros2/demos \
-                ros2/examples \
-                ros2/libyaml_vendor \
-                ros2/rcl \
+ROS2_PATCH_DIRS=eclipse-iceoryx/iceoryx \
+		ros-tracing/ros2_tracing \
+                ros2/rmw_implementation \
+                ros2/rmw_iceoryx \
                 ros2/rclcpp \
                 ros2/rclpy \
-                ros2/rcutils \
-                ros2/realtime_support \
-                ros2/rmw_implementation \
-                ros2/robot_state_publisher \
-                ros2/ros2cli \
-                ros2/rosidl \
-                ros2/rosidl_defaults \
-                ros2/rosidl_typesupport \
-                ros2/tinydir_vendor \
-                ros2/rmw_fastrtps/rmw_fastrtps_shared_cpp \
-                realtime_support/tlsf_cpp
+                ros2/rcutils
 
 # Ignore not used
 ROS_IGNORE_DIRS=ros-visualization \
 		ros2/rviz \
-                ros2/poco_vendor \
                 osrf/osrf_testing_tools_cpp \
                 ros-planning \
-                ros2/rmw_connext \
-                ros2/rosidl_typesupport_connext \
-                ros2/rmw_opensplice \
-                ros2/rosidl_typesupport_opensplice \
+                ros2/rmw_connextdds \
                 ament/ament_lint \
                 ament/uncrustify_vendor \
-		ros2/rcl_logging/rcl_logging_log4cxx \
-		eclipse-cyclonedds
-
+		eclipse-cyclonedds \
+		ros2/mimick_vendor \
+		ros2/performance_test_fixture \
+		ros2/rmw_cyclonedds \
+		eProsima \
+		ros2/rosidl_typesupport_fastrtps \
+		ros2/rmw_fastrtps
 
 # Ignore Python-specific packages
 #ROS_IGNORE_DIRS+= \
@@ -70,16 +56,16 @@ ROS_IGNORE_DIRS=ros-visualization \
                 ros2/rosidl_python/rosidl_generator_py \
                 ros-visualization/rqt/rqt_gui_py
 
-ROS2_EXAMPLES=examples_rcl*
+ROS2_EXAMPLES=examples_rclcpp_minimal_timer examples_rclcpp_minimal_client examples_rclcpp_minimal_service examples_rclcpp_minimal_publisher
 
-ROS2_PYTHON_TOOLS=ros2action ros2component ros2msg ros2node ros2pkg \
-	ros2service ros2topic ros2cli ros2lifecycle ros2multicast ros2param \
-	ros2run ros2srv
+ROS2_PYTHON_TOOLS=ros2action ros2cli ros2component ros2doctor \
+	ros2interface ros2lifecycle ros2multicast ros2node ros2param ros2pkg \
+	ros2run ros2service ros2topic
 
-PKG_PKGS_UP_TO+=$(ROS2_EXAMPLES) \
-	$(ROS2_PYTHON_TOOLS) \
-	pendulum_control
+PKG_PKGS_UP_TO+=$(ROS2_EXAMPLES)
+#	$(ROS2_PYTHON_TOOLS)
 
+#	pendulum_control
 #	dummy_map_server \
 #	dummy_sensors \
 #	robot_state_publisher
