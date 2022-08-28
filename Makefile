@@ -9,7 +9,7 @@ include $(WIND_USR_MK)/defs.vxworks.mk
 ifeq ($(WIND_RELEASE_ID),SR0640)
 DEFAULT_BUILD ?= sdk python unixextra asio tinyxml2 colcon ros2 turtlebot3
 else
-DEFAULT_BUILD ?= sdk unixextra asio tinyxml2 colcon ros2 turtlebot3
+DEFAULT_BUILD ?= sdk unixextra colcon ros2
 endif
 
 .PHONY: clean_buildstamps
