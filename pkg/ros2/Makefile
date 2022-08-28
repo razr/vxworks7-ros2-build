@@ -28,14 +28,14 @@ include $(WIND_USR_MK)/defs.crossbuild.mk
 PACKAGES += ros2
 
 PKG_NAME = ros2
-PKG_VER =  dashing
+PKG_VER = humble
 
 #PKG_URL = https://github.com/Wind-River/vxworks7-layer-for-ros2.git
-PKG_URL = https://github.com/Wind-River/vxworks7-layer-for-ros2.git
+PKG_URL = https://github.com/razr/vxworks7-layer-for-ros2.git
 PKG_TYPE = git
-PKG_COMMIT_ID = dashing-release-SR0640
+PKG_COMMIT_ID = humble-release-22.03
 
-PKG_REPO_COMMIT_ID = dashing-release
+PKG_REPO_COMMIT_ID = humble-release
 PKG_REPO_URL = https://raw.githubusercontent.com/ros2/ros2/${PKG_REPO_COMMIT_ID}/${PKG_NAME}.repos
 
 PKG_LICENSE = BSD
@@ -67,7 +67,9 @@ ros2.unpack: ros2.download
 	cd $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR); \
 	curl -o $(PKG_NAME).repos $(PKG_REPO_URL); \
 	mkdir src; \
-	vcs import src < $(PKG_NAME).repos
+	vcs import src < $(PKG_NAME).repos; \
+	cd src/ros2; \
+	git clone --branch humble-fix --single-branch https://github.com/xlla/rmw_iceoryx.git
 	@$(MAKE_STAMP)
 
 ros2.patch: ros2.unpack
@@ -94,8 +96,11 @@ ros2.build: ros2.configure
                 -DCMAKE_BUILD_TYPE:STRING=$(PKG_BUILD_TYPE) \
                 -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON \
 		-DCMAKE_TOOLCHAIN_FILE=$(TGT_CMAKE_TOOLCHAIN_FILE) \
+		-DPython3_EXECUTABLE=$(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3 \
 		-DPYTHON_SOABI=cpython-3$(TGT_PYTHON_MINOR)-vxworks \
-                -DBUILD_TESTING:BOOL=OFF
+                -DBUILD_TESTING:BOOL=OFF \
+		-DCMAKE_EXE_LINKER_FLAGS="-rpath-link $(ROOT_DIR)/lib" \
+		-DFORCE_BUILD_VENDOR_PKG=ON
 	@$(MAKE_STAMP)
 
 ros2.install : ros2.build
