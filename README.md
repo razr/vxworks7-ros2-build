@@ -6,9 +6,9 @@
 
 Wind River provides VxWorks ROS 2 build for selected SDKs and ROS 2 releases, see the following table for more details
 
-|           | [SR0640 SDK](https://labs.windriver.com/downloads/wrsdk_prev.html)   |
+|           | [22.03 SDK](https://forums.windriver.com/t/vxworks-software-development-kit-sdk/43)   |
 |:---------:|:-------------|
-|**[dashing](https://docs.ros.org/en/dashing/)**| [Intel UP2](https://labs.windriver.com/downloads/wrsdk-vxworks7-docs/README-up2.html)<br />[Raspberry Pi4](https://labs.windriver.com/downloads/wrsdk-vxworks7-docs/README-raspberrypi4b.html) |
+|**[humble](https://docs.ros.org/en/humble/)**| [Intel QEMU](https://labs.windriver.com/downloads/wrsdk-vxworks7-docs/2203/win/README_qemu.htmll)<br />[Raspberry Pi4](https://labs.windriver.com/downloads/wrsdk-vxworks7-docs/2203/README_raspberrypi4b.html) |
 
 ## Overview
 
@@ -58,7 +58,7 @@ Subject to the License, you can proceed to download the VxWorks SDK.
 ## Prerequisite(s)
 
 * Download a VxWorks Software Development Kit from Wind River Labs
-   * https://labs.windriver.com/downloads/wrsdk_prev.html
+   * https://forums.windriver.com/t/vxworks-software-development-kit-sdk/43
 
 * The build system will need to download source code from github.com and bitbucket.org.  A
   working Internet connection with access to both sites is required.
@@ -68,11 +68,11 @@ For the standard build you must also have:
 * Supported Linux host for both ROS2 and VxWorks 7
    * ROS 2.0 Target Platforms
       * http://www.ros.org/reps/rep-2000.html
-   * VxWorks 7 SR0640
-      * https://docs.windriver.com/bundle/vxworks_7_release_notes_sr0640/page/bym1551818657142.html
-   * For ROS2 Dashing Diademata, Ubuntu Bionic (18.04) 64-bit LTS is the Tier 1 host
+   * VxWorks 7 22.03
+      * https://docs.windriver.com/bundle/vxworks_release_notes_22_03/page/index-release_notes.html
+   * For ROS2 Humble Hawksbill, Ubuntu Jammy Jellyfish (22.04) 64-bit LTS is the Tier 1 host
 * Install the development tools and ROS tools from “Building ROS 2 on Linux”
-   * https://index.ros.org/doc/ros2/Installation/Dashing/Linux-Development-Setup/
+   * https://index.ros.org/doc/ros2/Installation/Humble/Linux-Development-Setup/
 * Install the “Required Linux Host OS Packages”  for VxWorks 7
    * https://docs.windriver.com/bundle/2020_03_Workbench_Release_Notes_SR0640_1/page/age1436590316395.html
 * Mercurial (hg) package for Eigen (optional)
@@ -126,43 +126,43 @@ The repository is cloned during the build to the *patches* dir
 
 ## Build ROS2 and its dependecies
 
-### Clone this repository using the `master` branch
+### Clone this repository using the `humble-release-22.03` branch
 
 ```bash
-git clone https://github.com/Wind-River/vxworks7-ros2-build.git
+git clone -b humble-release-22.03 https://github.com/Wind-River/vxworks7-ros2-build.git
 cd vxworks7-ros2-build
 ```
 
 ### Build Docker image
 
-A Docker (Ubuntu 18.04) based build is recommended to avoid a necessity of installing build dependencies.
+A Docker (Ubuntu 22.04) based build is recommended to avoid a necessity of installing build dependencies.
 
 ```bash
-docker build -t vxbuild:1.0 Docker/vxbuild/.
-docker build -t vxros2build:1.0 Docker/vxros2build/.
+docker build -t vxbuild:22.04 Docker/vxbuild/.
+docker build -t vxros2build:humble Docker/vxros2build/.
 ```
 
 ### Download and extract the VxWorks SDK
 
-The SDK for IA - UP Squared shall be used from https://labs.windriver.com/downloads/wrsdk_prev.html
+The SDK for IA - QEMU shall be used from https://forums.windriver.com/t/vxworks-software-development-kit-sdk/43
 
 ```bash
 cd Downloads
-wget https://labs.windriver.com/downloads/wrsdk-vxworks7-up2-1.7.tar.bz2
-tar –jxvf wrsdk-vxworks7-up2-1.7.tar.bz2
+wget https://d13321s3lxgewa.cloudfront.net/wrsdk-vxworks7-qemu-1.10.tar.bz2
+tar –jxvf wrsdk-vxworks7-qemu-1.10.tar.bz2
 ```
 
 ### Run Docker image
 
 ```bash
 cd vxworks7-ros2-build
-docker run -ti -v ~/Downloads/wrsdk-vxworks7-up2:/wrsdk -v $PWD:/work vxros2build:1.0
+docker run -ti -v ~/Downloads/wrsdk-vxworks7-qemu:/wrsdk -v $PWD:/work vxros2build:humble
 ```
 
 By default it runs as a user ```wruser``` with ```uid=1000(wruser) gid=1000(wruser)```, if you have different ids, run it as
 
 ```bash
-$ docker run -ti -e UID=`id -u` -e GID=`id -g` -v ~/Downloads/wrsdk-vxworks7-up2:/wrsdk -v $PWD:/work vxros2build:1.0
+$ docker run -ti -e UID=`id -u` -e GID=`id -g` -v ~/Downloads/wrsdk-vxworks7-qemu:/wrsdk -v $PWD:/work vxros2build:humble
 ```
 
 See [Dockerfile](Docker/vxbuild/Dockerfile) for the complete list of environment variables
@@ -172,7 +172,7 @@ See [Dockerfile](Docker/vxbuild/Dockerfile) for the complete list of environment
 Inside Docker container: source the development environment and start build
 
 ```bash
-wruser@d19165730517:/work source /wrsdk/toolkit/wind_sdk_env.linux
+wruser@d19165730517:/work source /wrsdk/sdkenv.sh
 wruser@d19165730517:/work make
 wruser@d19165730517:/work exit
 ```
@@ -190,13 +190,6 @@ Rebuild from scratch
 wruser@d19165730517:/work make distclean
 wruser@d19165730517:/work make
 wruser@d19165730517:/work exit
-```
-
-It could be that the build fails if it runs behind the firewall, see [#22](https://github.com/Wind-River/vxworks7-ros2-build/issues/22).
-In this case rerun it without a certificate check as
-
-```bash
-wruser@d19165730517:/work WGET_OPT="--no-check-certificate -O" CURL="" make
 ```
 
 ## Run ROS2 examples
@@ -237,7 +230,7 @@ $ sudo umount ~/tmp/mount
 ```
 
 ```bash
-sudo qemu-system-x86_64 -m 512M -kernel ~/Downloads/wrsdk-vxworks7-up2/bsps/itl_generic_2_0_2_1/boot/vxWorks -net nic -net tap,ifname=tap0,script=no,downscript=no -display none -serial stdio -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 u=ftp pw=ftp123 o=gei0 s=/ata4/vxscript" -device ich9-ahci,id=ahci -drive file=./ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
+sudo qemu-system-x86_64 -m 512M -kernel ~/Downloads/wrsdk-vxworks7-qemu/vxsdk/bsps/itl_generic_3_0_0_1/vxWorks -net nic -net tap,ifname=tap0,script=no,downscript=no -display none -serial stdio -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 u=ftp pw=ftp123 o=gei0 s=/ata4/vxscript" -device ich9-ahci,id=ahci -drive file=./ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
 ```
 
 The HDD image will be mounted inside VxWorks under `/usr` directory
@@ -321,8 +314,8 @@ Process 'python3' (process Id = 0xffff800008269c00) launched.
 
 ```
 $ cd vxworks7-ros2-build
-$ docker run -ti -v ~/Downloads/wrsdk-vxworks7-up2:/wrsdk -v $PWD:/work vxros2build:1.0
-wruser@690af330acaa:/work$ source /wrsdk/toolkit/wind_sdk_env.linux
+$ docker run -ti -v ~/Downloads/wrsdk-vxworks7-qemu:/wrsdk -v $PWD:/work vxros2build:humble
+wruser@690af330acaa:/work$ source /wrsdk/sdkenv.sh
 
 wruser@690af330acaa:/work$ git clone https://github.com/ttroy50/cmake-examples.git
 wruser@690af330acaa:/work$ cd cmake-examples/01-basic/A-hello-cmake; mkdir vxworks-build; cd vxworks-build
@@ -358,7 +351,7 @@ Native ROS2 is used mostly for the fast prototyping during the ROS 2 development
 
 ```bash
 $ cd vxworks7-ros2-build
-$ docker run -ti -h ros2native -v $PWD:/work vxros2build:1.0
+$ docker run -ti -h ros2native -v $PWD:/work vxros2build:humble
 wruser@ros2native:/work$ mkdir -p ros2_native/src && cd ros2_native
 wruser@ros2native:/work/ros2_native$ vcs import src < /work/build/ros2/ros2_ws/ros2.repos
 wruser@ros2native:/work/ros2_native$ colcon build --merge-install --cmake-force-configure --packages-up-to-regex examples_rcl* ros2action ros2component ros2msg ros2node ros2pkg ros2service ros2topic ros2cli ros2lifecycle ros2multicast ros2param ros2run ros2srv pendulum_control --cmake-args -DCMAKE_BUILD_TYPE:STRING=Debug -DBUILD_TESTING:BOOL=OFF
@@ -456,7 +449,7 @@ Hello World!
 1. Start docker and copy `my_package` to the VxWorks `ros2_ws` workspace
 
 ```bash
-$ docker run -ti -v ~/Downloads/wrsdk-vxworks7-up2:/wrsdk -v $PWD:/work vxros2build:1.0
+$ docker run -ti -v ~/Downloads/wrsdk-vxworks7-qemu:/wrsdk -v $PWD:/work vxros2build:humble
 wruser@690af330acaa:/work$ cp -r ros2_native/src/my_package build/ros2/ros2_ws/src/.
 ```
 
@@ -472,7 +465,7 @@ wruser@690af330acaa:/work$ exit
 3. Create `ros2.img` as described [here](#method-1-create-an-hdd-image) and start QEMU
 
 ```bash
-$ sudo qemu-system-x86_64 -m 512M -kernel ~/Downloads/wrsdk-vxworks7-up2/bsps/itl_generic_2_0_2_1/boot/vxWorks -net nic -net tap,ifname=tap0,script=no,downscript=no -display none -serial stdio -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 u=ftp pw=ftp123 o=gei0 s=/ata4/vxscript" -device ich9-ahci,id=ahci -drive file=./ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
+$ sudo qemu-system-x86_64 -m 512M -kernel ~/Downloads/wrsdk-vxworks7-qemu/vxsdk/bsps/itl_generic_3_0_0_1/vxWorks -net nic -net tap,ifname=tap0,script=no,downscript=no -display none -serial stdio -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 u=ftp pw=ftp123 o=gei0 s=/ata4/vxscript" -device ich9-ahci,id=ahci -drive file=./ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
 ```
 
 4. Setup environment variables and run `my_package`
