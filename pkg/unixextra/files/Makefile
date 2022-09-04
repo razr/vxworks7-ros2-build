@@ -49,8 +49,8 @@ $(TARGET).a: $(OBJECTS)
 %.o: %.c
 	$(CC) -static -c $< -o $@ -I. $(CC_FLAGS)
 
-$(TESTS): %: %.c
-	$(CC) -static -o $@ $< $(CC_FLAGS)
+$(TESTS): %: %.c $(TARGET).a
+	$(CC) -static -o $@ $< $(CC_FLAGS) $(TARGET).a
 
 clean:
 	@rm -rf *.o *.sho $(TARGET).* $(TESTS)
