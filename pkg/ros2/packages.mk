@@ -55,7 +55,7 @@ ROS_IGNORE_DIRS=ros-visualization \
                 ros2/rosidl_python/rosidl_generator_py \
                 ros-visualization/rqt/rqt_gui_py
 
-ROS2_EXAMPLES=examples_rclcpp_minimal_timer examples_rclcpp_minimal_client examples_rclcpp_minimal_service examples_rclcpp_minimal_publisher
+ROS2_EXAMPLES=examples_rclcpp_minimal_timer examples_rclcpp_minimal_client examples_rclcpp_minimal_service examples_rclcpp_minimal_publisher examples_rclpy_*
 
 ROS2_PYTHON_TOOLS=ros2action ros2cli ros2component ros2doctor \
 	ros2interface ros2lifecycle ros2multicast ros2node ros2param ros2pkg \
