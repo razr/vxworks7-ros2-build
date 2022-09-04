@@ -97,6 +97,7 @@ ros2.build: ros2.configure
 		-DPython3_EXECUTABLE=$(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3 \
 		-DPYTHON_SOABI=cpython-3$(TGT_PYTHON_MINOR)-vxworks \
                 -DBUILD_TESTING:BOOL=OFF \
+		-DRMW_IMPLEMENTATION=rmw_cyclonedds_cpp \
 		-DCMAKE_EXE_LINKER_FLAGS="-rpath-link $(ROOT_DIR)/lib" \
 		-DFORCE_BUILD_VENDOR_PKG=ON
 	@$(MAKE_STAMP)

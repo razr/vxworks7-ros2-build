@@ -22,6 +22,7 @@
 # SYNOPSIS        variables for ROS2 packages
 
 ROS2_PATCH_DIRS=eclipse-iceoryx/iceoryx \
+		eclipse-cyclonedds/cyclonedds \
 		ros-tracing/ros2_tracing \
                 ros2/rmw_implementation \
                 ros2/rmw_iceoryx \
@@ -37,10 +38,8 @@ ROS_IGNORE_DIRS=ros-visualization \
                 ros2/rmw_connextdds \
                 ament/ament_lint \
                 ament/uncrustify_vendor \
-		eclipse-cyclonedds \
 		ros2/mimick_vendor \
 		ros2/performance_test_fixture \
-		ros2/rmw_cyclonedds \
 		eProsima \
 		ros2/rosidl_typesupport_fastrtps \
 		ros2/rmw_fastrtps
