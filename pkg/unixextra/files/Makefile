@@ -40,7 +40,7 @@ all: $(TARGET).a $(TARGET).so.${LIBRARY_VER} $(TESTS)
 
 $(TARGET).so.${LIBRARY_VER}: $(SHOBJECTS)
 	$(CC) -shared -Wl,-soname,$@ $^ -o $@ $(CC_FLAGS)
-	ln -s $@ $(TARGET).so
+	ln -s -f $@ $(TARGET).so
 
 %.sho: %.c
 	$(CC) -fpic -c $< -o $@ -I. $(CC_FLAGS)
@@ -78,6 +78,10 @@ endif
 ifneq (,$(findstring pthread_getname.c,$(SOURCES)))
 	install -d $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
 	install -m 644 pthread.h $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
+endif
+ifneq (,$(findstring fork.c,$(SOURCES)))
+	install -d $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
+	install -m 644 unistd.h $(DESTDIR)$(PREFIX)/$(INCLUDE_PATH)
 endif
 	install -d $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
 	install -m 755 $(TARGET).a $(DESTDIR)$(PREFIX)/$(LIBRARY_PATH)
