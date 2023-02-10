@@ -39,9 +39,10 @@ PKG_COMMIT_ID = $(shell git rev-parse --abbrev-ref HEAD)
 
 ifeq ($(PKG_COMMIT_ID),master)
 PKG_REPO_COMMIT_ID = $(ROS_DISTRO)-release
+else ifneq (,$(findstring release,$(PKG_COMMIT_ID)))
+PKG_REPO_COMMIT_ID = $(ROS_DISTRO)-release
 else
-# extract ROS2 release part, <ros2 release>-<vxworks release>
-PKG_REPO_COMMIT_ID = $(shell git rev-parse --abbrev-ref HEAD | rev | cut -d '-' -f 2- | rev)
+PKG_REPO_COMMIT_ID = $(ROS_DISTRO)
 endif
 PKG_REPO_URL = https://raw.githubusercontent.com/ros2/ros2/${PKG_REPO_COMMIT_ID}/${PKG_NAME}.repos
 
