@@ -48,6 +48,22 @@ else()
     message(FATAL_ERROR "VxWorks compiler not found. Please set either WIND_CC_SYSROOT or WIND_CC_SDK_TARGET.")
 endif()
 
+# compiler driver takes this value from the default.conf
+execute_process(
+  COMMAND ${CMAKE_C_COMPILER} -dumpmachine
+  RESULT_VARIABLE RESULT
+  OUTPUT_VARIABLE TRIPLE
+  ERROR_QUIET
+)
+if (RESULT)
+  message(FATAL_ERROR "Failed to determine target architecture triplet: ${RESULT}")
+endif()
+# covert to the list and get the first element
+string(REPLACE "-" ";" TRIPLE ${TRIPLE})
+list(GET TRIPLE 0 ARCH)
+
+set(CMAKE_SYSTEM_PROCESSOR ${ARCH})
+
 # set cmake sysroot to VSB directory
 set(CMAKE_SYSROOT $ENV{WIND_CC_SYSROOT})
 
