@@ -32,17 +32,13 @@ ROS2_PATCH_DIRS=eclipse-iceoryx/iceoryx \
 # Ignore not used
 ROS_IGNORE_DIRS=ros-visualization \
 		ros2/rviz \
-                osrf/osrf_testing_tools_cpp \
                 ros-planning \
                 ros2/rmw_connextdds \
-                ament/ament_lint \
                 ament/uncrustify_vendor \
-		ros2/mimick_vendor \
-		ros2/performance_test_fixture \
-		eProsima \
-		eclipse-iceoryx \
-		ros2/rosidl_typesupport_fastrtps \
-		ros2/rmw_fastrtps
+                eProsima \
+                eclipse-iceoryx \
+                ros2/rosidl_typesupport_fastrtps \
+                ros2/rmw_fastrtps
 
 # Ignore Python-specific packages
 #ROS_IGNORE_DIRS+= \
@@ -61,7 +57,7 @@ ROS2_PYTHON_TOOLS=ros2action ros2cli ros2component ros2doctor \
 	ros2interface ros2lifecycle ros2multicast ros2node ros2param ros2pkg \
 	ros2run ros2service ros2topic
 
-PKG_PKGS_UP_TO+=$(ROS2_EXAMPLES)
+PKG_PKGS_UP_TO+=rcutils
 #	$(ROS2_PYTHON_TOOLS)
 
 #	pendulum_control
