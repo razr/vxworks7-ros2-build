@@ -21,8 +21,11 @@
 
 # SYNOPSIS        variables for ROS2 packages
 
-ROS2_PATCH_DIRS=eclipse-iceoryx/iceoryx \
+ROS2_PATCH_DIRS=ament/googletest \
+		eclipse-iceoryx/iceoryx \
 		eclipse-cyclonedds/cyclonedds \
+		osrf/osrf_testing_tools_cpp \
+		ros2/mimick_vendor \
 		ros2/ros2_tracing \
                 ros2/rmw_implementation \
                 ros2/rclcpp \
