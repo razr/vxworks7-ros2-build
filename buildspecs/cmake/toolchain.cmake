@@ -58,7 +58,7 @@ execute_process(
 if (RESULT)
   message(FATAL_ERROR "Failed to determine target architecture triplet: ${RESULT}")
 endif()
-# covert to the list and get the first element
+# convert to the list and get the first element
 string(REPLACE "-" ";" TRIPLE ${TRIPLE})
 list(GET TRIPLE 0 ARCH)
 
