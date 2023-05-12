@@ -31,7 +31,7 @@ PKG_NAME = ros2
 PKG_VER = $(ROS_DISTRO)
 
 # use the same branch for the patches
-PKG_URL = https://github.com/Wind-River/vxworks7-layer-for-ros2.git
+PKG_URL = https://github.com/razr/vxworks7-layer-for-ros2.git
 PKG_TYPE = git
 
 # a layer branch is always aligned with the current build branch
@@ -95,6 +95,7 @@ ros2.configure: ros2.patch
 	sed -i "s/-3./-3$(TGT_PYTHON_MINOR)/g" $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon/mixin/default/vxworks.mixin;
 	sed -i "s+/work+$(TOP_BUILDDIR)+g" $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon/mixin/default/vxworks.mixin;
 	sed -i "s+/wrsdk/vxsdk/host+$(WIND_SDK_HOST_TOOLS)+g" $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon/mixin/default/vxworks.mixin;
+	cp -ar files/host/* $(WIND_SDK_HOST_TOOLS)/x86_64-linux;
 	@$(MAKE_STAMP)
 
 ros2.build: ros2.configure
