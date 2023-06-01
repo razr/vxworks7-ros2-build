@@ -1,7 +1,7 @@
 FROM vxbuild:22.04
 
 # Environment variables
-ENV ROS_DISTRO humble
+ENV ROS_DISTRO iron
 ENV ROS2_WS /opt/ros2_ws
 ## Let the script create the workspace
 ## ENV PRJ_WS_NAME ${BSP}_${BOARD}_${PRJ}_ws
