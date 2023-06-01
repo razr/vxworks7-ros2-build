@@ -61,8 +61,8 @@ ROS2_PYTHON_TOOLS=ros2action ros2cli ros2component ros2doctor \
 	ros2interface ros2lifecycle ros2multicast ros2node ros2param ros2pkg \
 	ros2run ros2service ros2topic
 
-PKG_PKGS_UP_TO+=$(ROS2_EXAMPLES)
-#	$(ROS2_PYTHON_TOOLS)
+PKG_PKGS_UP_TO+=$(ROS2_EXAMPLES) \
+	$(ROS2_PYTHON_TOOLS)
 
 #	pendulum_control
 #	dummy_map_server \
