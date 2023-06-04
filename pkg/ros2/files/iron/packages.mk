@@ -27,7 +27,8 @@ ROS2_PATCH_DIRS=eclipse-iceoryx/iceoryx \
                 ros2/rmw_implementation \
                 ros2/rclcpp \
                 ros2/rclpy \
-                ros2/rcutils
+                ros2/rcutils \
+                ros2/ros2cli
 
 # Ignore not used
 ROS_IGNORE_DIRS=ros-visualization \
