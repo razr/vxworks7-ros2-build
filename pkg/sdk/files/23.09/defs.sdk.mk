@@ -46,10 +46,8 @@ define python_fix
 		ln -f -r -s $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3.$(TGT_PYTHON_MINOR) $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3 ; \
 		ln -f -r -s $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3.$(TGT_PYTHON_MINOR) $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python ; \
 	fi ; \
-	if [ ! -f $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/pip3 ]; then \
-		cd $(DOWNLOADS_DIR) && $(call fetch_web,$(PKG_NAME),https://bootstrap.pypa.io/get-pip.py,get-pip.py) ; \
-		python3 $(DOWNLOADS_DIR)/get-pip.py ; \
-	fi ; \
+	cd $(DOWNLOADS_DIR) && $(call fetch_web,$(PKG_NAME),https://bootstrap.pypa.io/get-pip.py,get-pip.py) ; \
+	python3 $(DOWNLOADS_DIR)/get-pip.py ; \
 	if [ -d $(3PP_DEPLOY_DIR)/usr/lib/python3.$(TGT_PYTHON_MINOR)/site-packages ]; then \
 		cp -r $(3PP_DEPLOY_DIR)/usr/lib/python3.$(TGT_PYTHON_MINOR)/site-packages $(3PP_DEVELOP_DIR)/usr/lib/python3.$(TGT_PYTHON_MINOR)/. ; \
 	fi
@@ -65,9 +63,11 @@ endef
 
 define sdk_deploy
 	cp $(WIND_CC_SYSROOT)/usr/lib/common/lib*.so.1 $(DEPLOY_DIR)/lib/. ; \
-	cp $(3PP_DEVELOP_DIR)/usr/bin/* $(DEPLOY_DIR)/bin/. ; \
-	cp $(3PP_DEVELOP_DIR)/usr/lib/lib*.so* $(DEPLOY_DIR)/lib/. ; \
-	cp -r $(3PP_DEVELOP_DIR)/usr/lib/python3.* $(DEPLOY_DIR)/lib/.
+	if [ -d $(3PP_DEPLOY_DIR)/usr ]; then \
+		cp $(3PP_DEVELOP_DIR)/usr/bin/* $(DEPLOY_DIR)/bin/. ; \
+		cp $(3PP_DEVELOP_DIR)/usr/lib/lib*.so* $(DEPLOY_DIR)/lib/. ; \
+		cp -r $(3PP_DEVELOP_DIR)/usr/lib/python3.* $(DEPLOY_DIR)/lib/. ; \
+	fi
 endef
 
 endif
