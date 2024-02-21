@@ -301,6 +301,7 @@ The HDD image will be mounted inside VxWorks under the `/usr` directory
 /usr/lib
 /usr/share
 /usr/vxscript
+/usr/usr_vxscript
 ```
 
 ### Telnet to the VxWorks QEMU target
@@ -317,6 +318,13 @@ Copy the content of the `deploy` directory to the '/usr' directory of the SDCard
 ```bash
 $ sudo cp -r -L ./output/export/deploy/* /usr/.
 ```
+
+Run the following command on VxWorks to manually set the ROS 2 environment.
+
+```bash
+-> usrStartupScript("/sd0a/usr/usr_vxscript")
+```
+
 
 ### Run ROS 2 C++ examples
 
