@@ -21,7 +21,7 @@ DEFAULT_BUILD ?= sdk unixextra asio tinyxml2 eigen libxml2 libxslt ros2 pyyaml n
 endif
 endif
 
-.PHONY: clean_buildstamps
+.PHONY: clean_buildstamps create_package
 
 all: $(DOWNLOADS_DIR) $(STAMP_DIR) $(EXPORT_DIR)
 	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.install || exit 1; done;
@@ -59,6 +59,9 @@ image: fs
 	find $(TOP_BUILDDIR)/export/deploy -type d -name '__pycache__' -exec rm -rf {} +
 	cp --no-preserve=ownership -r -L $(TOP_BUILDDIR)/export/deploy/* $(TOP_BUILDDIR)/mount/. 2>/dev/null
 	fusermount -u $(TOP_BUILDDIR)/mount
+
+create_package:
+	$(call pkg_create)
 
 info:
 	@$(ECHO) "DEFAULT_BUILD:      $(DEFAULT_BUILD)"
