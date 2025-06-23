@@ -1,0 +1,8 @@
+{
+  "inputs": {
+    "pkg_url": "https://github.com/fmtlib/fmt",
+    "sdk_name": "qemu",
+    "vxworks_release": "24.03"
+  }
+}
+

@@ -1,0 +1,59 @@
+# This workflow builds an arbitrary package against the VxWorks SDK.
+
+name: 'pkg build'
+run-name: Build ${{ inputs.pkg_url }} against VxWorks ${{ inputs.vxworks }} ${{ inputs.sdk }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      pkg_url:
+        description: 'pkg url to build'
+        required: true
+      vxworks:
+        description: 'VxWorks Release'
+        required: true
+        default: '24.03'
+      sdk:
+        description: 'SDK Name'
+        required: true
+        default: 'qemu'
+      debug:
+        description: 'Debug'
+        required: false
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # Check if input variables exist, otherwise set defaults for scheduled runs
+      pkg_url: ${{ github.event.inputs.pkg_url}}
+      vxworks: ${{ github.event.inputs.vxworks || '24.03' }}
+      sdk: ${{ github.event.inputs.sdk || 'qemu' }}
+      debug: ${{ github.event.inputs.debug || 'false' }}
+
+    steps:
+      - name: Checks-out a branch ${{ github.ref }}
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Download SDK action
+        uses: ./.github/actions/setup-wrsdk
+        with:
+          sdks_list: wrsdks.json
+          sdk: ${{ env.sdk }}
+          vxworks: ${{ env.vxworks }}
+          directory: /tmp
+          sdkenv: true
+
+      - name: Build pkg ${{ env.pkg_url }} against VxWorks ${{ env.vxworks }} ${{ env.sdk }}
+        run:  |
+          env | grep WIND
+          make create_package PKG_TMPL_URL=${{ env.pkg_url }}
+          DEFAULT_BUILD="sdk unixextra `basename ${{ env.pkg_url }}`" make
+
+      - name: Setup tmate session
+        if: ${{ env.debug == 'true' }}
+        uses: mxschmitt/action-tmate@v3
+
