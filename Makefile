@@ -11,7 +11,9 @@ DEFAULT_BUILD ?= sdk unixextra asio tinyxml2 eigen libxml2 libxslt ros2 pyyaml n
 
 ifeq ($(ROS_DISTRO),)
 ifeq ($(filter ros2,$(DEFAULT_BUILD)),ros2)
+ifeq (,$(filter create_package,$(MAKECMDGOALS)))
   $(error Please export ROS_DISTRO)
+endif
 endif
 endif
 
