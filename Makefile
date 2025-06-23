@@ -7,17 +7,11 @@ include $(WIND_USR_MK)/defs.common.mk
 include $(WIND_USR_MK)/defs.packages.mk
 include $(WIND_USR_MK)/defs.vxworks.mk
 
-ifeq ($(ROS_DISTRO),)
-$(error Please export ROS_DISTRO)
-endif
-
-ifeq ($(WIND_RELEASE_ID),SR0640)
-DEFAULT_BUILD ?= sdk python unixextra asio tinyxml2 colcon ros2 turtlebot3
-else
-ifeq ($(ROS_DISTRO),dashing)
-DEFAULT_BUILD ?= sdk unixextra asio tinyxml2 colcon ros2 turtlebot3
-else
 DEFAULT_BUILD ?= sdk unixextra asio tinyxml2 eigen libxml2 libxslt ros2 pyyaml netifaces
+
+ifeq ($(ROS_DISTRO),)
+ifeq ($(filter ros2,$(DEFAULT_BUILD)),ros2)
+  $(error Please export ROS_DISTRO)
 endif
 endif
 
