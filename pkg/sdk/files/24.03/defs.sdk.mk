@@ -24,6 +24,7 @@ __sdk_defs = TRUE
 
 include $(WIND_USR_MK)/defs.packages.mk
 include $(WIND_USR_MK)/defs.python.mk
+include $(WIND_USR_MK)/defs.vxworks.mk
 
 define sdk_fix
 	if [ ! -f $(WIND_CC_SYSROOT)/mk/defs.autotools.mk ]; then \
