@@ -27,8 +27,11 @@ ifeq ($(WIND_SDK_CC_SYSROOT),)
 $(error WIND_CC_SYSROOT is not set, please source the environment)
 else
 export WIND_CC_SYSROOT=$(WIND_SDK_CC_SYSROOT)
-export WIND_SDK_HOST_TOOLS=$(WIND_SDK_HOME)/vxsdk/host
 endif
+endif
+
+ifeq ($(WIND_SDK_HOST_TOOLS),)
+  export WIND_SDK_HOST_TOOLS := $(WIND_SDK_HOME)/vxsdk/host
 endif
 
 ## Add missing variablse from SDK
