@@ -25,6 +25,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    continue-on-error: true
     env:
       # Check if input variables exist, otherwise set defaults for scheduled runs
       pkg_url: ${{ github.event.inputs.pkg_url}}
@@ -47,13 +48,33 @@ jobs:
           directory: /tmp
           sdkenv: true
 
-      - name: Build pkg ${{ env.pkg_url }} against VxWorks ${{ env.vxworks }} ${{ env.sdk }}
-        run:  |
-          env | grep WIND
-          make create_package PKG_TMPL_URL=${{ env.pkg_url }}
-          DEFAULT_BUILD="sdk unixextra `basename ${{ env.pkg_url }}`" make
-
       - name: Setup tmate session
         if: ${{ env.debug == 'true' }}
         uses: mxschmitt/action-tmate@v3
 
+      - name: Build pkg ${{ env.pkg_url }} against VxWorks ${{ env.vxworks }} ${{ env.sdk }}
+        run:  |
+          env | grep WIND
+          make create_package PKG_TMPL_URL=${{ env.pkg_url }}
+          DEFAULT_BUILD="sdk unixextra `basename ${{ env.pkg_url }}`" make > >(tee build_stdout.log) 2> >(tee build_stderr.log >&2)
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ./output/build/fmt/build/compile_commands.json
+            *.log
+
+  error-extractor:
+    needs: build
+    if: needs.build.result == 'failure'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fault localization
+        run: echo "Build failed. Fault localization."
+      - name: Patch Generation
+        run: echo "Build failed. Patch Generation."
+      - name: Patch Validation
+        run: echo "Build failed. Patch Validation."
