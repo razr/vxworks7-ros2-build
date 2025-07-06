@@ -103,7 +103,7 @@ define pkg_create
 	@if [ ! -z "$(PKG_TMPL_NAME)" ]; then \
                 if [ -f "pkg/$(PKG_TMPL_NAME)/Makefile" ]; then \
                         echo "Package created at pkg/$(PKG_TMPL_NAME) with PKG_COMMIT_ID=$(PKG_TMPL_COMMIT_ID)"; \
-                        echo "DEFAULT_BUILD=$(PKG_TMPL_NAME) make"; \
+                        echo "DEFAULT_BUILD=\"sdk unixextra $(PKG_TMPL_NAME)\" make"; \
                 else \
                         $(shell mkdir -p pkg/$(PKG_TMPL_NAME)) \
 		        $(file >pkg/$(PKG_TMPL_NAME)/Makefile,$(pkg_template)) \
