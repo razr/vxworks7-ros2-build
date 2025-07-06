@@ -84,7 +84,7 @@ endef
 
 define sdk_install
 	$(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/pip3 install -r files/$(WIND_RELEASE_ID)/requirements.txt ;
-	export SSL_CERT_FILE=$(shell $(WIND_CC_SYSROOT)/usr/3pp/develop/usr/bin/python3 -m certifi) ;
+	export SSL_CERT_FILE=$(shell $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3 -m certifi) ;
 
 	if [ ! -f "$(VIRTUAL_ENV)/bin/activate" ]; then \
 		echo "setup 'crossenv'."; \
