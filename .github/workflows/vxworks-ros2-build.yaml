@@ -99,11 +99,6 @@ jobs:
           directory: /tmp
           sdkenv: false
 
-      - name: store runners uid and gid
-        run: |
-          echo "`id -u`" > /tmp/wrsdk/uid
-          echo "`id -g`" > /tmp/wrsdk/gid
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
         with:
@@ -146,21 +141,19 @@ jobs:
           docker images vxros2build:${{ env.ros_distro }}
 
       - name: Build ROS 2 ${{ env.ros_distro }} against VxWorks ${{ env.vxworks }} ${{ env.sdk }}
-        uses: addnab/docker-run-action@v3
-        with:
-          image: vxros2build:${{ env.ros_distro }}
-          options: -v ${{ github.workspace }}:/work -v /tmp/wrsdk:/wrsdk
-          shell: bash
-          run:  |
-            groupadd -g "`cat /wrsdk/gid`" wruser
-            useradd -u "`cat /wrsdk/uid`" -m wruser -g wruser
-            su wruser -c "bash -lc 'source /wrsdk/sdkenv.sh && make fs -C /work'"
+        run:  |
+          docker run --rm \
+            -e UID=$(id -u) -e GID=$(id -g) \
+            -v /tmp/wrsdk:/wrsdk \
+            -v ${{ github.workspace }}:/work \
+            vxros2build:${{ env.ros_distro }} \
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs -C /work'
 
       - name: Create an SROS2 script
         run: |
           cat << 'EOF' > /tmp/sros2_script.sh
           #!/bin/bash
-          
+          set -x
           . /opt/ros/${{ env.ros_distro }}/setup.sh
           ros2 security create_keystore demo_keystore
           ros2 security create_enclave demo_keystore /talker_listener/talker
@@ -169,14 +162,14 @@ jobs:
           chmod +x /tmp/sros2_script.sh
 
       - name: Generate a keystore, keys, and certificates for the talker and listener nodes
-        uses: addnab/docker-run-action@v3
-        with:
-          image: vxros2build:${{ env.ros_distro }}
-          options: -v ${{ github.workspace }}:/work -v /tmp/sros2_script.sh:/tmp/sros2_script.sh
-          run:  |
-            cd /tmp
-            /tmp/sros2_script.sh
-            mv /tmp/demo_keystore /work/output/export/deploy/.
+        run:  |
+          docker run --rm \
+            -w /tmp \
+            -e UID=$(id -u) -e GID=$(id -g) \
+            -v /tmp/sros2_script.sh:/tmp/sros2_script.sh \
+            -v ${{ github.workspace }}:/work \
+            vxros2build:${{ env.ros_distro }} \
+            /bin/bash -c 'cd /tmp && /tmp/sros2_script.sh && mv /tmp/demo_keystore /work/output/export/deploy/.'
 
       - name: Create an HDD image
         run: |
