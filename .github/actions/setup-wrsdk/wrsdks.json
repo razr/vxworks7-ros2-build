@@ -13,6 +13,19 @@
             "sdk_version": "1.6"
          }
       ]
+    },
+    {
+      "release": "25.09",
+      "sdk": [
+         {
+            "name": "qemu",
+            "sdk_version": "1.16"
+         },
+         {
+            "name": "raspberrypi4b",
+            "sdk_version": "1.8.1"
+         }
+      ]
     }
   ]
 }
