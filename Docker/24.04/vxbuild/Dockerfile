@@ -21,7 +21,8 @@ COPY ./docker-entrypoint.sh /
 
 # make /bin/sh symlink to bash instead of dash:
 RUN echo "dash dash/sh boolean false" | debconf-set-selections \
-&& DEBIAN_FRONTEND=noninteractive dpkg-reconfigure dash
+&& DEBIAN_FRONTEND=noninteractive dpkg-reconfigure dash \
+&& ln -sf /bin/bash /bin/sh
 
 WORKDIR /work
 
