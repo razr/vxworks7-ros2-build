@@ -79,7 +79,7 @@ runs:
       shell: bash
 
     - name: Source SDK environment
-      if: ${{ inputs.sdkenv }} == 'true'
+      if: ${{ inputs.sdkenv == 'true' }}
       run: |
         . ${{ inputs.directory }}/wrsdk/sdkenv.sh
         echo "WIND_SDK_HOME=$WIND_SDK_HOME" >> $GITHUB_ENV
