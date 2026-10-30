@@ -183,7 +183,7 @@ jobs:
           docker run --rm \
             -e UID=$(id -u) -e GID=$(id -g) \
             -e CCACHE_DIR=/ccache -e CCACHE_COMPILERCHECK=content -e CCACHE_MAXSIZE=5G \
-            -e CMAKE_C_COMPILER_LAUNCHER=ccache -e CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -e CMAKE_C_COMPILER_LAUNCHER=ccache-launcher -e CMAKE_CXX_COMPILER_LAUNCHER=ccache-launcher \
             -v /tmp/ccache:/ccache \
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \

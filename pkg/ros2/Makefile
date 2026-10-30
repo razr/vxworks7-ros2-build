@@ -122,6 +122,7 @@ ros2.build: ros2.configure
 	[ -d /etc/ssl/certs ] && export SSL_CERT_DIR=/etc/ssl/certs; \
 	export COLCON_HOME=$(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon; \
 	export COLCON_EXTENSION_BLOCKLIST=colcon_core.environment.library_path; \
+	export ROS2_INSTALL_LIB=$(ROOT_DIR)/lib; \
 	colcon build --install-base $(ROOT_DIR) --merge-install \
 	  --mixin $(ROS2_MIXINS) --packages-skip-build-finished --packages-up-to-regex $(ROS2_VENDORS)
 	@echo "=== Phase 2: building the ROS2 workspace (only reached if Phase 1 succeeded) ==="
