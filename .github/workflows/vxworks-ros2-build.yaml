@@ -179,7 +179,12 @@ jobs:
 
       - name: Build ROS 2 ${{ env.ros_distro }} against VxWorks ${{ env.vxworks }} ${{ env.sdk }}
         run:  |
+          # World-writable so the in-container build user (wruser, remapped to
+          # the -e UID the entrypoint creates) can write the bind-mounted cache
+          # regardless of host ownership. Without this, ccache cannot write its
+          # cache dir and the compile fails.
           mkdir -p /tmp/ccache
+          chmod 777 /tmp/ccache
           docker run --rm \
             -e UID=$(id -u) -e GID=$(id -g) \
             -e CCACHE_DIR=/ccache -e CCACHE_COMPILERCHECK=content -e CCACHE_MAXSIZE=5G \
