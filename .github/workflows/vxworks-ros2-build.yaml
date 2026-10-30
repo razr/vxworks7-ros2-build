@@ -230,7 +230,7 @@ jobs:
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c '. /wrsdk/sdkenv.sh && make -C /work toolkit'
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make toolkit -C /work'
 
       - name: Upload the ROS 2 SDK toolkit
         if: ${{ inputs.toolkit }}
