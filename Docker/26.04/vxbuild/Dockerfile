@@ -4,7 +4,7 @@ RUN dpkg --add-architecture i386 && \
   apt-get update && apt-get -y dist-upgrade && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   g++-multilib libstdc++6:i386 libxtst6:i386 \
   gtk2-engines-murrine:i386 libatk-adaptor:i386 \
-  unzip bc git wget \
+  unzip bc git wget ccache \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 

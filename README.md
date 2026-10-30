@@ -241,6 +241,31 @@ In this case, rerun it without a certificate check as
 wruser@vxros2:/work WGET_OPT="--no-check-certificate -O" CURL="" make
 ```
 
+### Speed up rebuilds with `ccache` (optional)
+
+The ROS 2 C/C++ compile is the dominant build cost. `ccache` caches compiled
+objects so unchanged sources are not recompiled on a rebuild. It is **opt-in and
+needs no changes to the harness** — CMake reads `CMAKE_<LANG>_COMPILER_LAUNCHER`
+from the environment, so just export it before `make`:
+
+```bash
+# ccache must be installed (apt-get install -y ccache)
+export CCACHE_DIR=$HOME/.ccache-vxros2       # persistent across builds
+export CCACHE_COMPILERCHECK=content          # hash wr-cc/wr-c++ by content
+export CCACHE_MAXSIZE=10G
+export CMAKE_C_COMPILER_LAUNCHER=ccache
+export CMAKE_CXX_COMPILER_LAUNCHER=ccache
+
+make fs          # first build populates the cache (all misses)
+make distclean && make fs
+ccache -s        # rebuild shows direct cache hits -> much faster compile
+```
+
+Notes: accelerates **compiles only** (not vcs fetch / cmake configure / rosidl
+codegen); use a persistent `CCACHE_DIR` so the cache survives `make distclean`.
+CI enables the same via `CMAKE_*_COMPILER_LAUNCHER` + an `actions/cache` on
+`CCACHE_DIR` (see `.github/workflows/vxworks-ros2-build.yaml`).
+
 ## Run ROS 2 examples
 
 QEMU is used to boot VxWorks and run Python and C++ ROS 2 examples, for that `tap0` interface shall be configured.

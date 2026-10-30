@@ -166,10 +166,25 @@ jobs:
         run: |
           docker images vxros2build:${{ env.ros_distro }}
 
+      - name: Restore ccache (ROS 2 C/C++ compile cache)
+        uses: actions/cache@v4
+        with:
+          path: /tmp/ccache
+          # key on SDK + distro; restore-keys warm-starts from the latest prior
+          # cache even when the exact key changes (ccache self-validates hits).
+          key: ccache-${{ env.sdk }}-${{ env.ros_distro }}-${{ env.vxworks }}-${{ github.sha }}
+          restore-keys: |
+            ccache-${{ env.sdk }}-${{ env.ros_distro }}-${{ env.vxworks }}-
+            ccache-${{ env.sdk }}-${{ env.ros_distro }}-
+
       - name: Build ROS 2 ${{ env.ros_distro }} against VxWorks ${{ env.vxworks }} ${{ env.sdk }}
         run:  |
+          mkdir -p /tmp/ccache
           docker run --rm \
             -e UID=$(id -u) -e GID=$(id -g) \
+            -e CCACHE_DIR=/ccache -e CCACHE_COMPILERCHECK=content -e CCACHE_MAXSIZE=5G \
+            -e CMAKE_C_COMPILER_LAUNCHER=ccache -e CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+            -v /tmp/ccache:/ccache \
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
