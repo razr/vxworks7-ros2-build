@@ -8,7 +8,8 @@ built. Also pins the layer (url + branch + resolved commit) and the SDK/distro/a
 
 Usage:
   generate-manifest.py <packages.mk> <ros_distro> <vxworks_release> \
-      <vxworks_sdk> <arch> <layer_url> <layer_branch> <layer_commit> [rust_target]
+      <vxworks_sdk> <arch> <layer_url> <layer_branch> <layer_commit> \
+      [rust_target] [build_commit] [build_describe]
 """
 import re, json, sys, datetime
 
@@ -42,7 +43,9 @@ def var(lines, name):
 def main():
     (mk, ros_distro, vx_rel, vx_sdk, arch,
      layer_url, layer_branch, layer_commit) = sys.argv[1:9]
-    rust_target = sys.argv[9] if len(sys.argv) > 9 else f"{arch}-wrs-vxworks"
+    rust_target    = sys.argv[9]  if len(sys.argv) > 9  else f"{arch}-wrs-vxworks"
+    build_commit   = sys.argv[10] if len(sys.argv) > 10 else ""
+    build_describe = sys.argv[11] if len(sys.argv) > 11 else ""
     lines = open(mk).read().splitlines()
     v = lambda n: var(lines, n)
 
@@ -51,6 +54,13 @@ def main():
         "vxworks_release": vx_rel,
         "vxworks_sdk": vx_sdk,
         "arch": arch,
+        # the build repo (vxworks7-ros2-build) that produced this kit -- check it
+        # out at `build.commit` and re-run `make toolkit` to reproduce.
+        "build": {
+            "repo": "vxworks7-ros2-build",
+            "commit": build_commit,
+            "describe": build_describe,
+        },
         "layer": {
             "PKG_LAYER_URL": layer_url,
             "PKG_LAYER_COMMIT_ID": layer_branch,
@@ -66,7 +76,7 @@ def main():
         "ROS2_EXAMPLES": v("ROS2_EXAMPLES"),
         "ROS2_RUST": v("ROS2_RUST"),
         "ROS2_RUST_TARGET": rust_target,
-        "built_on": datetime.date.today().isoformat(),
+        "built_on": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
     }
     print(json.dumps(manifest, indent=2))
 

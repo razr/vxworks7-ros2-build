@@ -3,15 +3,18 @@
 A development kit for building **ROS 2 applications for VxWorks** and running
 them on QEMU.
 
-It ships the **ROS 2 SDK** (`export/root/`) — ROS 2 (rclcpp/rcl/rmw + message packages,
-ament_cmake, the host `ros2`/`colcon` tooling) prebuilt for VxWorks — plus a
-containerized development environment, a bootable target image, and helper
-scripts.
+It ships:
 
-> **You provide the Wind River VxWorks SDK.** This kit does **not** include the
-> VxWorks SDK (Wind River licensed). Download/install your vanilla
-> `wrsdk-vxworks7-qemu` yourself and point the kit at it (mounted into the dev
-> container). The kit is not publicly redistributable together with the SDK.
+- the **ROS 2 SDK** (`export/root/`) prebuilt for VxWorks
+- the **SDK overlay** (`sdk_overlay/`) — the delta applied to a vanilla VxWorks SDK
+- a bootable **target image** (`ros2.img`)
+- a containerized **dev environment** (`.devcontainer/`) + VS Code tasks (`.vscode/`)
+- helper **scripts** (`scripts/`) — prepare, env, build, run on QEMU
+
+> This kit does **not** include the VxWorks SDK (Wind River licensed).
+> Download/install your vanilla `wrsdk-vxworks7-qemu` yourself and point the kit
+> at it (mounted into the dev container). The kit is not publicly redistributable
+> together with the SDK.
 
 ## What's in the kit
 
@@ -90,8 +93,10 @@ Deliver your freshly built binary to the target as a **USB disk** — no image
 repack needed:
 
 ```bash
-# tap0 up: sudo ip tuntap add dev tap0 mode tap
-#          sudo ip addr add 192.168.200.254/24 dev tap0; sudo ip link set tap0 up
+# tap0 up (once, needs root):
+#   sudo ip tuntap add dev tap0 mode tap
+#   sudo ip addr add 192.168.200.254/24 dev tap0
+#   sudo ip link set tap0 up
 ./scripts/run-qemu.sh --usb install/my_app/lib/my_app
 ```
 
