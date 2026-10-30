@@ -47,12 +47,12 @@ on:
         required: true
         default: qemu
       test:
-        description: "Run tests"
+        description: "run tests"
         required: false
         default: false
         type: boolean
       toolkit:
-        description: "Assemble + upload the ROS 2 SDK toolkit"
+        description: "toolkit"
         required: false
         default: false
         type: boolean

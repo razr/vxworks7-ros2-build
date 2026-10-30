@@ -7,11 +7,11 @@ on:
   workflow_dispatch:
     inputs:
       test:
-        description: "Run on-QEMU tests"
+        description: "run tests"
         type: boolean
         default: true
       toolkit:
-        description: "Assemble + upload the ROS 2 SDK toolkit"
+        description: "toolkit"
         type: boolean
         default: false
 
