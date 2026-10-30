@@ -111,7 +111,7 @@ define sdk_install
         else \
                 echo "'crossenv' already exists."; \
         fi ; \
-        $(call sdk_rust_fixups)
+        $(call rust_fix)
 endef
 
 # VxWorks Rust toolchain gap the SDK ships but does not fix: libloading has no
@@ -119,7 +119,7 @@ endef
 # (not ROS 2 specific), so it lives with the SDK: patch upstream 0.8.9 into
 # $(WIND_CC_SYSROOT)/usr/rust/vxworks-crates/libloading, which Rust consumers point
 # [patch.crates-io] at.
-define sdk_rust_fixups
+define rust_fix
         RP=$(CURDIR)/files/$(WIND_RELEASE_ID)/rust-patches ; \
         CRATES=$(WIND_CC_SYSROOT)/usr/rust/vxworks-crates ; \
         LL="$$CRATES/libloading/src/os/unix/consts.rs" ; \

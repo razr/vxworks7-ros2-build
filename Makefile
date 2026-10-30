@@ -7,6 +7,9 @@ include $(WIND_USR_MK)/defs.common.mk
 include $(WIND_USR_MK)/defs.packages.mk
 include $(WIND_USR_MK)/defs.vxworks.mk
 include $(WIND_USR_MK)/defs.python.mk
+include $(WIND_USR_MK)/defs.fs.mk
+include $(WIND_USR_MK)/defs.image.mk
+include $(WIND_USR_MK)/defs.toolkit.mk
 
 ifeq ($(ROS_DISTRO),)
 $(error Please export ROS_DISTRO)
@@ -48,32 +51,6 @@ distclean: clean
 
 clean: clean_buildstamps
 	for p in $(DEFAULT_BUILD); do rm -rf $(BUILD_DIR)/$$p; done;
-
-fs: all
-	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.deploy || exit 1; done;
-
-image: fs
-	dd if=/dev/zero of=$(TOP_BUILDDIR)/ros2.img count=2048 bs=1M
-	mkfs.vfat -F 32 $(TOP_BUILDDIR)/ros2.img
-	mkdir -p $(TOP_BUILDDIR)/mount
-	fusefat -o rw+ $(TOP_BUILDDIR)/ros2.img $(TOP_BUILDDIR)/mount
-	# Prepare the deployed python for the target: pre-compile .pyc (unchecked-hash,
-	# so the target never recompiles on its slow FS) and rewrite the setuptools
-	# EASY-INSTALL console-script shims to importlib.metadata (the pkg_resources
-	# shims scan all *.dist-info at startup -- minutes on the target). Both steps
-	# are defined in mk/usr/defs.python.mk. Replaces the old 'rm __pycache__'.
-	$(call python_prepare_deploy,$(TOP_BUILDDIR)/export/deploy)
-	# Prune build/dev-only artifacts the TARGET never needs at runtime, to cut the
-	# fusefat copy's per-file cost (file count dominates the FUSE write time).
-	# KEEP *.dist-info / *.egg-info (ros2 run entry-point discovery reads them) and
-	# the CPython stdlib test dir ($(TOP_BUILDDIR)/export/deploy/lib/python3.9/test).
-	find $(TOP_BUILDDIR)/export/deploy \( -path '*/cmake/*' -o -name '*.cmake' \) -type f -delete
-	find $(TOP_BUILDDIR)/export/deploy/lib -type d \( -name test -o -name tests \) \
-	    -not -path '*/python3.*/test' -not -path '*/python3.*/test/*' -exec rm -rf {} +
-	find $(TOP_BUILDDIR)/export/deploy/lib -type d -name include -not -path '*/python3.*/*' -exec rm -rf {} +
-	find $(TOP_BUILDDIR)/export/deploy \( -name '*.a' -o -name '*.pc' \) -type f -delete
-	cp --no-preserve=ownership -r -L $(TOP_BUILDDIR)/export/deploy/* $(TOP_BUILDDIR)/mount/. 2>/dev/null
-	fusermount -u $(TOP_BUILDDIR)/mount
 
 examples: fs
 	@set -e; \

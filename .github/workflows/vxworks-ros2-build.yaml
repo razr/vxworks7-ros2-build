@@ -23,6 +23,10 @@ on:
         required: false
         type: boolean
         default: false
+      toolkit:
+        required: false
+        type: boolean
+        default: false
       debug:
         required: false
         type: boolean
@@ -44,6 +48,11 @@ on:
         default: qemu
       test:
         description: "Run tests"
+        required: false
+        default: false
+        type: boolean
+      toolkit:
+        description: "Assemble + upload the ROS 2 SDK toolkit"
         required: false
         default: false
         type: boolean
@@ -212,6 +221,23 @@ jobs:
           path: |
             ${{ github.workspace }}/ros2.img
             ${{ github.workspace }}/*xWorks*
+
+      - name: Assemble the ROS 2 SDK toolkit
+        if: ${{ inputs.toolkit }}
+        run: |
+          docker run --rm \
+            -e UID=$(id -u) -e GID=$(id -g) \
+            -v /tmp/wrsdk:/wrsdk \
+            -v ${{ github.workspace }}:/work \
+            vxros2build:${{ env.ros_distro }} \
+            /bin/bash -c '. /wrsdk/sdkenv.sh && make image toolkit -C /work'
+
+      - name: Upload the ROS 2 SDK toolkit
+        if: ${{ inputs.toolkit }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-vxworks-sdk-kit ${{ env.sdk }} ${{ env.ros_distro }}
+          path: ${{ github.workspace }}/output/ros2-vxworks-sdk-kit-*.tar.*
 
       - name: Setup tmate session
         if: ${{ inputs.debug }}
