@@ -3,3 +3,7 @@ output*
 .cproject
 .project
 .settings/
+
+# the kit ships its own VS Code tasks (build + run-on-QEMU) as a deliverable
+!toolkit/.vscode/
+!toolkit/.vscode/*
