@@ -244,49 +244,35 @@ wruser@vxros2:/work WGET_OPT="--no-check-certificate -O" CURL="" make
 ### Speed up rebuilds with `ccache` (optional)
 
 The ROS 2 C/C++ compile is the dominant build cost. `ccache` caches compiled
-objects so unchanged sources are not recompiled on a rebuild. It is **opt-in and
-needs no changes to the harness** — CMake reads `CMAKE_<LANG>_COMPILER_LAUNCHER`
-from the environment, so just export it before `make`:
+objects so unchanged sources are not recompiled on a rebuild. It is **opt-in**:
+set `CCACHE_DIR` (with `ccache` installed) and build normally — the Makefile
+auto-enables ccache whenever `CCACHE_DIR` is set.
 
 ```bash
 # ccache must be installed (apt-get install -y ccache)
-
-# Why a launcher? ROS 2 packages install ament environment hooks
-# (share/<pkg>/environment/library_path.{sh,dsv}) that prepend the install lib
-# dir to LD_LIBRARY_PATH; colcon --merge-install re-sources that base on every
-# package build, so $ROOT_DIR/lib -- full of VxWorks *target* .so files
-# (libzstd.so.1, libc.so.1, ...) -- lands on LD_LIBRARY_PATH during the build.
-# wr-cc/wr-c++ ignore it (static drivers; they find target libs via -rpath-link
-# in cc-conf/default.conf). But the dynamically-linked host `ccache` would load a
-# VxWorks .so and crash ("libc.so.1: cannot open shared object file"). The
-# launcher strips only the install lib dir for ccache -- same trick as the repo's
-# host-cc-clean.sh for cargo's host linker.
-cat > /tmp/ccache-launcher <<'SH'
-#!/bin/bash
-clean=$(echo "${LD_LIBRARY_PATH}" | tr ':' '\n' | grep -v -F "${ROS2_INSTALL_LIB:-__none__}" | paste -sd:)
-export LD_LIBRARY_PATH="$clean"
-exec ccache "$@"
-SH
-chmod +x /tmp/ccache-launcher
-
-export ROS2_INSTALL_LIB=$PWD/output/export/root/lib   # the dir to strip for ccache
-export CCACHE_DIR=$HOME/.ccache-vxros2       # persistent across builds
+export CCACHE_DIR=$HOME/.ccache-vxros2       # setting this enables ccache
 export CCACHE_COMPILERCHECK=content          # hash wr-cc/wr-c++ by content
 export CCACHE_MAXSIZE=10G
-export CMAKE_C_COMPILER_LAUNCHER=/tmp/ccache-launcher
-export CMAKE_CXX_COMPILER_LAUNCHER=/tmp/ccache-launcher
 
-make fs          # first build populates the cache (all misses)
+make fs                        # first build populates the cache (all misses)
 make distclean && make fs
-ccache -s        # rebuild shows direct cache hits -> much faster compile
+ccache -s                      # rebuild shows direct cache hits -> faster compile
 ```
+
+When `CCACHE_DIR` is set, the build wraps the compiler via
+`CMAKE_<LANG>_COMPILER_LAUNCHER` with a two-element launcher: `host-clean-env.sh`
+then `ccache`. `host-clean-env.sh` strips the ROS 2 target install lib dir from
+`LD_LIBRARY_PATH` first — ROS 2 ament hooks prepend `$ROOT_DIR/lib` (VxWorks
+target `.so` files) to `LD_LIBRARY_PATH` during colcon builds, and the
+dynamically-linked host `ccache` would otherwise load a VxWorks `.so` and crash
+(`libc.so.1: cannot open shared object file`). `wr-cc`/`wr-c++` are static and
+unaffected. See `pkg/ros2/files/<distro>/host-clean-env.sh` for the full story;
+it is the same wrapper `host-cc-clean.sh` uses for cargo's host linker.
 
 Notes: accelerates **compiles only** (not vcs fetch / cmake configure / rosidl
 codegen); use a persistent `CCACHE_DIR` so the cache survives `make distclean`.
-CI enables the same via a `ccache-launcher` wrapper (baked into the build image)
-+ an `actions/cache` on `CCACHE_DIR` (see
-`.github/workflows/vxworks-ros2-build.yaml`); `ros2.build` exports
-`ROS2_INSTALL_LIB` so the launcher knows which dir to strip.
+Unset `CCACHE_DIR` for a plain build with no caching. CI sets `CCACHE_DIR` and
+caches it via `actions/cache` (see `.github/workflows/vxworks-ros2-build.yaml`).
 
 ## Run ROS 2 examples
 

@@ -76,6 +76,7 @@ info:
 	@$(ECHO) "TARGET SOABI:       $(Python_SOABI)"
 	@$(ECHO) "HOST PYTHON:        `which python3`"
 	@$(ECHO) "CMAKE:              `which cmake`"
+	@$(ECHO) "CCACHE:             $(if $(CCACHE_DIR),on (CCACHE_DIR=$(CCACHE_DIR)),off (set CCACHE_DIR to enable))"
 	@$(ECHO) "CURDIR:             $(CURDIR)"
 	@$(ECHO) "DOWNLOADS_DIR:      $(DOWNLOADS_DIR)"
 	@$(ECHO) "PACKAGE_DIR:        $(PACKAGE_DIR)"
