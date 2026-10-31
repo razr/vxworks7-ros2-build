@@ -258,13 +258,11 @@ jobs:
           name: ros2-vxworks-sdk-kit ${{ env.sdk }} ${{ env.ros_distro }}
           path: ${{ github.workspace }}/output/ros2-vxworks-sdk-kit-*.tar.*
 
-      - name: Setup tmate session
+      - name: Setup upterm session
         if: ${{ always() && inputs.debug }}
-        uses: mxschmitt/action-tmate@v3
-        timeout-minutes: 60
+        uses: owenthereal/action-upterm@v2
         with:
-          detached: false
-          limit-access-to-actor: false
+          limit-access-to-actor: true
 
       - name: Set outputs for sdk and ros_distro
         id: set_outputs
