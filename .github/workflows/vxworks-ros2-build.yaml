@@ -261,6 +261,10 @@ jobs:
       - name: Setup tmate session
         if: ${{ always() && inputs.debug }}
         uses: mxschmitt/action-tmate@v3
+        timeout-minutes: 60
+        with:
+          detached: false
+          limit-access-to-actor: false
 
       - name: Set outputs for sdk and ros_distro
         id: set_outputs
