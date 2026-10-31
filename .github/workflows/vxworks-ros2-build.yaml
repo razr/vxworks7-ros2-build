@@ -259,7 +259,7 @@ jobs:
           path: ${{ github.workspace }}/output/ros2-vxworks-sdk-kit-*.tar.*
 
       - name: Setup tmate session
-        if: ${{ inputs.debug }}
+        if: ${{ always() && inputs.debug }}
         uses: mxschmitt/action-tmate@v3
 
       - name: Set outputs for sdk and ros_distro
