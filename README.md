@@ -259,15 +259,18 @@ make distclean && make fs
 ccache -s                      # rebuild shows direct cache hits -> faster compile
 ```
 
-When `CCACHE_DIR` is set, the build wraps the compiler via
-`CMAKE_<LANG>_COMPILER_LAUNCHER` with a two-element launcher: `host-clean-env.sh`
-then `ccache`. `host-clean-env.sh` strips the ROS 2 target install lib dir from
-`LD_LIBRARY_PATH` first — ROS 2 ament hooks prepend `$ROOT_DIR/lib` (VxWorks
-target `.so` files) to `LD_LIBRARY_PATH` during colcon builds, and the
-dynamically-linked host `ccache` would otherwise load a VxWorks `.so` and crash
-(`libc.so.1: cannot open shared object file`). `wr-cc`/`wr-c++` are static and
-unaffected. See `pkg/ros2/files/<distro>/host-clean-env.sh` for the full story;
-it is the same wrapper `host-cc-clean.sh` uses for cargo's host linker.
+When `CCACHE_DIR` is set, the build sets `CMAKE_<LANG>_COMPILER_LAUNCHER=ccache`
+for the colcon build so the host `ccache` fronts `wr-cc`/`wr-c++`. No wrapper
+script is used. The build also normalizes `LD_LIBRARY_PATH` before invoking
+colcon: `sdkenv.sh` appends the SDK host lib dirs starting from an unset
+variable, which leaves a trailing `:` — an empty path element that the dynamic
+loader treats as the current directory. During the build the compiler runs with
+its working directory inside each package's build dir; for `zstd_vendor` that
+dir contains a freshly-built VxWorks `libzstd.so.1`. Since the dynamically-linked
+host `ccache` depends on `libzstd.so.1`, the loader would otherwise resolve that
+dependency from `.` (the VxWorks lib), which needs `libc.so.1` and makes `ccache`
+crash (`libc.so.1: cannot open shared object file`). Stripping the empty element
+fixes it. `wr-cc`/`wr-c++` are statically linked and unaffected.
 
 Notes: accelerates **compiles only** (not vcs fetch / cmake configure / rosidl
 codegen); use a persistent `CCACHE_DIR` so the cache survives `make distclean`.

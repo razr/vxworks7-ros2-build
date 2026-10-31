@@ -64,16 +64,28 @@ include $(PACKAGE_DIR)/ros2/files/$(ROS_DISTRO)/packages.mk
 # ccache (opt-in): if CCACHE_DIR is set in the environment, wrap the compiler with
 # ccache for faster rebuilds via CMAKE_<LANG>_COMPILER_LAUNCHER. Empty unless
 # CCACHE_DIR is set, so default builds are unchanged. Set CCACHE_DIR (e.g.
-# $HOME/.ccache-vxros2) to enable. No LD_LIBRARY_PATH wrapper is needed: the
-# ament library_path hook that used to prepend the VxWorks target install lib
-# dir is suppressed for cross-builds (see the ament_cmake CMAKE_CROSSCOMPILING
-# patch), so the host ccache starts cleanly.
+# $HOME/.ccache-vxros2) to enable.
 ifneq ($(CCACHE_DIR),)
 ROS2_CCACHE_ENV = export CMAKE_C_COMPILER_LAUNCHER=ccache; \
 	export CMAKE_CXX_COMPILER_LAUNCHER=ccache;
 else
 ROS2_CCACHE_ENV =
 endif
+
+# Drop empty elements from LD_LIBRARY_PATH (leading/trailing/duplicate ':') so the
+# dynamic loader never falls back to the current working directory.
+#
+# Why this is needed: sdkenv.sh builds LD_LIBRARY_PATH as "<dir>:${LD_LIBRARY_PATH}"
+# starting from an unset LD_LIBRARY_PATH, leaving a trailing ':' -- an empty path
+# element, which the loader treats as the current directory. During the build make
+# runs the compiler with CWD inside each package's build dir; for zstd_vendor that
+# dir holds the freshly-built *VxWorks* libzstd.so.1. The host ccache links
+# libzstd.so.1, so its loader would resolve that dependency from '.' = the VxWorks
+# libzstd, which NEEDs libc.so.1 -> ccache dies with
+# "libc.so.1: cannot open shared object file". (Only zstd_vendor builds a libzstd,
+# which is why it was the only package to fail.) Applied in the build subshells
+# below so colcon and every compiler it spawns get a clean path.
+LD_PATH_SANITIZE = export LD_LIBRARY_PATH="$$(printf '%s' "$$LD_LIBRARY_PATH" | sed -E 's/::+/:/g; s/^://; s/:$$//')";
 
 ros2.unpack: ros2.download
 	@$(call echo_action,Unpacking,$*)
@@ -136,6 +148,7 @@ ros2.build: ros2.configure
 	[ -d /etc/ssl/certs ] && export SSL_CERT_DIR=/etc/ssl/certs; \
 	export COLCON_HOME=$(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon; \
 	export COLCON_EXTENSION_BLOCKLIST=colcon_core.environment.library_path; \
+	$(LD_PATH_SANITIZE) \
 	$(ROS2_CCACHE_ENV) \
 	colcon build --install-base $(ROOT_DIR) --merge-install \
 	  --mixin $(ROS2_MIXINS) --packages-skip-build-finished --packages-up-to-regex $(ROS2_VENDORS)
@@ -146,6 +159,7 @@ ros2.build: ros2.configure
 	export COLCON_HOME=$(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon; \
 	export COLCON_EXTENSION_BLOCKLIST=colcon_core.environment.library_path; \
 	export CARGO_BUILD_TARGET=$(ROS2_RUST_TARGET); \
+	$(LD_PATH_SANITIZE) \
 	$(ROS2_CCACHE_ENV) \
 	colcon build --install-base $(ROOT_DIR) --merge-install \
 	  --mixin $(ROS2_MIXINS) --packages-skip-build-finished --packages-up-to-regex $(PKG_PKGS_UP_TO)

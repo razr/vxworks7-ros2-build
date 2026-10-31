@@ -179,26 +179,18 @@ jobs:
 
       - name: Build ROS 2 ${{ env.ros_distro }} against VxWorks ${{ env.vxworks }} ${{ env.sdk }}
         run:  |
-          # Run directly as the host user via --user, bypassing the image
-          # entrypoint. The entrypoint's non-interactive path (su -c "$*") alters
-          # LD_LIBRARY_PATH propagation to deeply-nested build children, which
-          # makes the dynamically-linked ccache invoked by zstd_vendor's inner
-          # ExternalProject fail to load its libraries (libc.so.1). Running as
-          # --user with --entrypoint /bin/bash avoids that su path entirely.
-          # (Interactive runs work because the entrypoint takes the tty branch;
-          # CI is non-interactive, so it hit the broken su -c branch.)
-          # chmod 777 so the bind-mounted cache is writable by the --user uid.
+          # chmod 777 so the in-container build user (wruser, remapped to the
+          # passed -e UID by the entrypoint) can write the bind-mounted cache dir.
           mkdir -p /tmp/ccache
           chmod 777 /tmp/ccache
           docker run --rm \
-            --user $(id -u):$(id -g) \
-            --entrypoint /bin/bash \
+            -e UID=$(id -u) -e GID=$(id -g) \
             -e CCACHE_DIR=/ccache -e CCACHE_COMPILERCHECK=content -e CCACHE_MAXSIZE=5G \
             -v /tmp/ccache:/ccache \
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            -c '. /wrsdk/sdkenv.sh && make fs -C /work'
+            /bin/bash -c '. /wrsdk/sdkenv.sh && make fs -C /work'
 
       - name: Create an SROS2 script
         run: |
@@ -250,15 +242,12 @@ jobs:
       - name: Assemble the ROS 2 SDK toolkit
         if: ${{ inputs.toolkit }}
         run: |
-          # Same --user/--entrypoint approach as the build step: avoid the
-          # entrypoint su -c path (see the build step for the full rationale).
           docker run --rm \
-            --user $(id -u):$(id -g) \
-            --entrypoint /bin/bash \
+            -e UID=$(id -u) -e GID=$(id -g) \
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            -c '. /wrsdk/sdkenv.sh && make toolkit -C /work'
+            /bin/bash -c '. /wrsdk/sdkenv.sh && make toolkit -C /work'
 
       - name: Upload the ROS 2 SDK toolkit
         if: ${{ inputs.toolkit }}
