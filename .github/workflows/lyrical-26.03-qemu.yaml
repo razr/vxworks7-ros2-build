@@ -14,6 +14,10 @@ on:
         description: "toolkit"
         type: boolean
         default: false
+      debug:
+        description: "enable debug mode"
+        type: boolean
+        default: false
 
 jobs:
   build-lyrical:
@@ -27,4 +31,5 @@ jobs:
       # avoid the `false || true` short-circuit gotcha with boolean inputs.)
       test: ${{ github.event_name != 'workflow_dispatch' || inputs.test == true }}
       toolkit: ${{ github.event_name == 'workflow_dispatch' && inputs.toolkit == true }}
-      debug: false
+      debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug == true }}
+ 
