@@ -298,7 +298,6 @@ jobs:
 
       - name: Install QEMU and expect
         env:
-          GH_TOKEN: ${{ github.token }}
           SDK: ${{ needs.build.outputs.sdk }}
         run: |
           sudo apt-get update
@@ -307,9 +306,16 @@ jobs:
           if [ "$SDK" = "raspberrypi4b" ]; then
             # raspi4b is aarch64 and needs the PATCHED qemu (BCM2838 GENET + SD->
             # emmc2 routing) from razr/qemu-raspi4-deb -- distro qemu lacks these.
-            # Install the released .deb: provides qemu-system-aarch64-raspi4.
-            gh release download --repo razr/qemu-raspi4-deb --pattern '*.deb' --dir /tmp/qemu-raspi4 --clobber
-            sudo apt-get install -y /tmp/qemu-raspi4/*.deb
+            # Fetch the latest release's .deb directly (public repo, no token):
+            # resolve the asset URL via the public API, then curl it. Resolving
+            # the URL (rather than hardcoding the version+sha filename) survives
+            # version bumps.
+            mkdir -p /tmp/qemu-raspi4
+            deb_url=$(curl -fsSL https://api.github.com/repos/razr/qemu-raspi4-deb/releases/latest \
+              | grep -oE 'https://[^"]*/qemu-raspi4_[^"]*_amd64\.deb' | head -1)
+            echo "qemu-raspi4 deb: $deb_url"
+            curl -fL -o /tmp/qemu-raspi4/qemu-raspi4.deb "$deb_url"
+            sudo apt-get install -y /tmp/qemu-raspi4/qemu-raspi4.deb
             qemu-system-aarch64-raspi4 --version | head -1
           else
             # x86_64: distro qemu + KVM.
