@@ -33,12 +33,15 @@ TOOLKIT_LAYER_COMMIT_ID ?= $(ROS_DISTRO)-release-$(WIND_RELEASE_ID)
 TOOLKIT_LAYER_COMMIT    ?=
 
 # --- the target -------------------------------------------------------------
-# toolkit depends on `image` so export/root, export/deploy and ros2.img all
-# exist before we assemble. The heavy lifting lives in toolkit/make-toolkit.sh
-# (like a Yocto do_* task calling a recipe), so this stays declarative.
+# toolkit CONSUMES the already-built artifacts (export/root, export/deploy and
+# ros2.img); building them is NOT its job. It is intentionally decoupled from
+# the `image`/`fs` targets so the caller (CI, or a local `make image && make
+# toolkit`) owns producing ros2.img. toolkit/make-toolkit.sh verifies ros2.img
+# exists at $(TOP_BUILDDIR)/ros2.img and fails with a clear message otherwise,
+# so this stays declarative and does not rebuild the image.
 .PHONY: toolkit toolkit-clean toolkit-info
 
-toolkit: image
+toolkit:
 	@$(ECHO) "📦 Assembling ROS 2 VxWorks SDK toolkit: $(TOOLKIT_NAME)"
 	TOP_BUILDDIR="$(TOP_BUILDDIR)" \
 	EXPORT_DIR="$(EXPORT_DIR)" ROOT_DIR="$(ROOT_DIR)" DEPLOY_DIR="$(DEPLOY_DIR)" \

@@ -219,10 +219,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y dosfstools
           cd ${{ github.workspace }}
-          dd if=/dev/zero of=ros2.img count=2048 bs=1M
-          mkfs.vfat -F 32 ./ros2.img
+          # Build the image at the Makefile's canonical location (output/ros2.img,
+          # = $(TOP_BUILDDIR)/ros2.img) so downstream consumers (make toolkit /
+          # make-toolkit.sh) find it where they expect.
+          dd if=/dev/zero of=output/ros2.img count=2048 bs=1M
+          mkfs.vfat -F 32 ./output/ros2.img
           mkdir -p /tmp/mount
-          sudo mount -o loop -t vfat ./ros2.img /tmp/mount
+          sudo mount -o loop -t vfat ./output/ros2.img /tmp/mount
           sudo cp -r -L ./output/export/deploy/* /tmp/mount/.
           df -h /tmp/mount/
           sudo umount /tmp/mount
@@ -236,7 +239,7 @@ jobs:
         with:
           name: HDD image ${{ env.sdk }} ${{ env.ros_distro }}
           path: |
-            ${{ github.workspace }}/ros2.img
+            ${{ github.workspace }}/output/ros2.img
             ${{ github.workspace }}/*xWorks*
 
       - name: Assemble the ROS 2 SDK toolkit
