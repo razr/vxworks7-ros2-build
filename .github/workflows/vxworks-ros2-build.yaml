@@ -310,6 +310,8 @@ jobs:
           # Change directory to GitHub workspace
           cd ${{ github.workspace }}
 
-          # Run tests
+          # Run tests. The HDD-image artifact preserves its build-job path, so the
+          # downloaded image is at ./output/ros2.img (the Makefile canonical
+          # location); pass it explicitly to main_script.exp (default ./ros2.img).
           echo "Running tests..."
-          ./tests/main_script.exp
+          ./tests/main_script.exp output/ros2.img
