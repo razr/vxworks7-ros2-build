@@ -301,22 +301,34 @@ jobs:
           SDK: ${{ needs.build.outputs.sdk }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y expect uml-utilities
+          sudo apt-get install -y expect uml-utilities jq
 
           if [ "$SDK" = "raspberrypi4b" ]; then
-            # raspi4b is aarch64 and needs the PATCHED qemu (BCM2838 GENET + SD->
-            # emmc2 routing) from razr/qemu-raspi4-deb -- distro qemu lacks these.
-            # Fetch the latest release's .deb directly (public repo, no token):
-            # resolve the asset URL via the public API, then curl it. Resolving
-            # the URL (rather than hardcoding the version+sha filename) survives
-            # version bumps.
-            mkdir -p /tmp/qemu-raspi4
-            deb_url=$(curl -fsSL https://api.github.com/repos/razr/qemu-raspi4-deb/releases/latest \
-              | grep -oE 'https://[^"]*/qemu-raspi4_[^"]*_amd64\.deb' | head -1)
-            echo "qemu-raspi4 deb: $deb_url"
-            curl -fL -o /tmp/qemu-raspi4/qemu-raspi4.deb "$deb_url"
-            sudo apt-get install -y /tmp/qemu-raspi4/qemu-raspi4.deb
-            qemu-system-aarch64-raspi4 --version | head -1
+            # raspi4b is aarch64. By default it needs the PATCHED qemu (BCM2838
+            # GENET + SD->emmc2 routing) from razr/qemu-raspi4-deb -- distro qemu
+            # lacks these. The source is configured in qemu.json (.raspberrypi4b.qemu):
+            #   "host"   -> use the distro qemu-system-aarch64 (apt)
+            #   "latest" -> install the newest razr/qemu-raspi4-deb release .deb
+            #   <url>    -> install that specific .deb URL
+            QEMU_SRC=$(jq -r '.raspberrypi4b.qemu' .github/workflows/qemu.json)
+            echo "qemu source (qemu.json .raspberrypi4b.qemu): $QEMU_SRC"
+            if [ "$QEMU_SRC" = "host" ]; then
+              sudo apt-get install -y qemu-system-arm
+              echo "VX_QEMU=qemu-system-aarch64" >> "$GITHUB_ENV"
+            else
+              deb_url="$QEMU_SRC"
+              if [ "$QEMU_SRC" = "latest" ]; then
+                # resolve the newest release asset URL (public repo, no token)
+                deb_url=$(curl -fsSL https://api.github.com/repos/razr/qemu-raspi4-deb/releases/latest \
+                  | grep -oE 'https://[^"]*/qemu-raspi4_[^"]*_amd64\.deb' | head -1)
+              fi
+              echo "qemu-raspi4 deb: $deb_url"
+              mkdir -p /tmp/qemu-raspi4
+              curl -fL -o /tmp/qemu-raspi4/qemu-raspi4.deb "$deb_url"
+              sudo apt-get install -y /tmp/qemu-raspi4/qemu-raspi4.deb
+              qemu-system-aarch64-raspi4 --version | head -1
+              echo "VX_QEMU=qemu-system-aarch64-raspi4" >> "$GITHUB_ENV"
+            fi
           else
             # x86_64: distro qemu + KVM.
             sudo apt-get install -y qemu-system-x86
@@ -341,10 +353,10 @@ jobs:
           cd ${{ github.workspace }}
 
           if [ "$SDK" = "raspberrypi4b" ]; then
-            # Point the harness at the patched aarch64 emulator and the rpi4
-            # target; the dtb was staged next to the kernel by the build job.
+            # Select the rpi4 target path in the harness. VX_QEMU was exported to
+            # $GITHUB_ENV by the install step (patched qemu-raspi4 or host qemu,
+            # per qemu.json). The dtb was staged next to the kernel by the build job.
             export VX_TARGET=rpi4
-            export VX_QEMU=qemu-system-aarch64-raspi4
           fi
 
           # Run tests. The HDD-image artifact preserves its build-job path, so the
