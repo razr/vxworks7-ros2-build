@@ -5,7 +5,6 @@ RUN dpkg --add-architecture i386 && \
   g++-multilib libstdc++6:i386 libxtst6:i386 \
   gtk2-engines-murrine:i386 libatk-adaptor:i386 \
   unzip bc git wget ccache \
-  dosfstools fuse fusefat \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
