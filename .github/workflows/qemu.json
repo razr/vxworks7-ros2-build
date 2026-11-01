@@ -1,6 +1,0 @@
-{
-  "raspberrypi4b": {
-    "//": "qemu-system-aarch64-raspi4 source. Set 'qemu' to 'host' to use the distro qemu-system-aarch64 (apt), or to a .deb URL to install the patched emulator (razr/qemu-raspi4-deb: BCM2838 GENET + SD->emmc2). 'latest' resolves the newest release asset at run time (not pinned to a version/sha).",
-    "qemu": "latest"
-  }
-}
