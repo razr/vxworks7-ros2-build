@@ -6,21 +6,19 @@ proc test05-sros2_talker_py {} {
     # path prints  Can't open "<path>".  (not the Linux "No such file or
     # directory"), so the skip arm must match the VxWorks wording too, else the
     # absent-keystore case falls through to timeout.
-    send "ls /usr/demo_keystore/public\r"
+    vxworks::send_cmd $qemu::spawn_id "ls /usr/demo_keystore/public"
     expect {
         -re {ca\.cert\.pem} {
-            send "set env \"ROS_SECURITY_ENABLE=true\"\r"
-            expect -exact $vxworks::prompt_cmd
-            send "python3 ros2 run demo_nodes_cpp talker --ros-args --enclave /talker_listener/talker\r"
+            vxworks::set_env $qemu::spawn_id "ROS_SECURITY_ENABLE=true"
+            vxworks::send_cmd $qemu::spawn_id "python3 ros2 run demo_nodes_cpp talker --ros-args --enclave /talker_listener/talker"
             expect -exact {Found security directory}
             expect -exact {Publishing}
             expect -exact {Publishing}
             expect -exact {Publishing}
             expect -exact {Publishing}
             send_ctrl_c
-            send "set env \"ROS_SECURITY_ENABLE=false\"\r"
-            expect -exact $vxworks::prompt_cmd
-            send "rtp delete /usr/lib/demo_nodes_cpp/talker"
+            vxworks::set_env $qemu::spawn_id "ROS_SECURITY_ENABLE=false"
+            vxworks::send_cmd $qemu::spawn_id "rtp delete /usr/lib/demo_nodes_cpp/talker"
         }
         -re {Can't open|No such file or directory} {
             puts "demo_keystore not found, skipping SROS2 test."

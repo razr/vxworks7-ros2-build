@@ -4,7 +4,7 @@ proc test03-timer_lambda_py {} {
     # pkg_resources metadata off the image before the node runs. Give it room,
     # and fail loudly instead of falling through to Ctrl-C a half-started python.
     set timeout 600
-    send "python3 ros2 run examples_rclcpp_minimal_timer timer_lambda\r"
+    vxworks::send_cmd $qemu::spawn_id "python3 ros2 run examples_rclcpp_minimal_timer timer_lambda"
     for {set i 0} {$i < 5} {incr i} {
         expect {
             -exact {Hello, world!} { }
@@ -16,5 +16,5 @@ proc test03-timer_lambda_py {} {
         }
     }
     send_ctrl_c
-    send "rtp delete /usr/lib/examples_rclcpp_minimal_timer/timer_lambda"
+    vxworks::send_cmd $qemu::spawn_id "rtp delete /usr/lib/examples_rclcpp_minimal_timer/timer_lambda"
 }

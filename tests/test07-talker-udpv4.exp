@@ -7,7 +7,7 @@ proc test07-talker-udpv4 {} {
     vxworks::set_env $qemu::spawn_id "RMW_IMPLEMENTATION=rmw_fastrtps_cpp"
     vxworks::set_env $qemu::spawn_id "FASTDDS_BUILTIN_TRANSPORTS=UDPv4"
 
-    send "/usr/lib/demo_nodes_cpp/talker\r"
+    vxworks::send_cmd $qemu::spawn_id "/usr/lib/demo_nodes_cpp/talker"
     expect -exact {Publishing}
     expect -exact {Publishing}
     expect -exact {Publishing}

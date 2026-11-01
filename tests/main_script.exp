@@ -28,17 +28,10 @@ proc run_tests {test_scripts} {
             # Back to the serial console: a test may have left the telnet spawn
             # as the implicit channel.
             set spawn_id $qemu::spawn_id
-            # Resync to a SETTLED command-shell prompt before the next test sends
-            # its first command. A single send+expect can match a prompt drawn
-            # mid-scroll while the shell is still emitting the previous test's
-            # output, so the next command's first chars get swallowed (observed:
-            # "/usr/lib/.../timer_lambda" arriving as "r/lib/.../timer_lambda").
-            # First drain any pending output (quiet window), then send Enter and
-            # wait for a fresh prompt, so the console is truly idle + ready.
-            expect -timeout 2 {
-                -re {.+} { exp_continue }
-                timeout {}
-            }
+            # Settle the console on a fresh command-shell prompt before the next
+            # test runs. Draining to a quiet window is handled by the library
+            # (vxworks::drain) so the settle logic lives in exactly one place.
+            vxworks::drain $qemu::spawn_id
             send "\r"
             expect -exact $vxworks::prompt_cmd
         }

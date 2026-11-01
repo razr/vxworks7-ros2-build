@@ -6,7 +6,7 @@ proc test06-rclrs {} {
     vxworks::set_env $qemu::spawn_id "RMW_IMPLEMENTATION=rmw_fastrtps_cpp"
     vxworks::set_env $qemu::spawn_id "FASTDDS_BUILTIN_TRANSPORTS=SHM"
 
-    send "/usr/lib/examples_rclrs_minimal_pub_sub/minimal_publisher\r"
+    vxworks::send_cmd $qemu::spawn_id "/usr/lib/examples_rclrs_minimal_pub_sub/minimal_publisher"
     expect -exact {Publishing}
     expect -exact {Publishing}
     expect -exact {Publishing}

@@ -37,10 +37,31 @@ namespace eval vxworks {
     variable prompt_kernel {->}
     variable prompt_cmd    {]# }
 
+    # Drain any pending output on a channel until it is quiet for `quiet` seconds.
+    # The VxWorks serial console drops the leading characters of a command that is
+    # typed while the shell is still emitting the previous command's output (a
+    # prompt can be drawn mid-scroll). Draining to a quiet window before sending
+    # guarantees the console is idle and ready, so no characters are swallowed
+    # (observed: "/usr/lib/.../timer_lambda" arriving as "r/lib/.../timer_lambda").
+    proc drain {id {quiet 1}} {
+        expect -i $id -timeout $quiet {
+            -re {.+} { exp_continue }
+            timeout {}
+        }
+    }
+
+    # Send a command on a channel the safe way: drain to a quiet console first,
+    # then send. Use this instead of a bare `send` for anything typed at a shell
+    # prompt. Does NOT wait for a result -- the caller expects its own marker.
+    proc send_cmd {id cmd} {
+        drain $id
+        send -i $id "$cmd\r"
+    }
+
     # Enter the command shell from the kernel shell on the given channel.
     proc enter_cmd_shell {id} {
         variable prompt_cmd
-        send -i $id "cmd\r"
+        send_cmd $id "cmd"
         expect -i $id -exact $prompt_cmd
     }
 
@@ -49,7 +70,7 @@ namespace eval vxworks {
     # prompt to return. No shell switch: this stays in the command shell.
     proc kernel_cmd {id routine} {
         variable prompt_cmd
-        send -i $id "C $routine\r"
+        send_cmd $id "C $routine"
         expect -i $id -exact $prompt_cmd
     }
 
@@ -58,14 +79,14 @@ namespace eval vxworks {
     # prompt. Env is per-RTP, so set it on each channel before launching a node.
     proc set_env {id assignment} {
         variable prompt_cmd
-        send -i $id "set env \"$assignment\"\r"
+        send_cmd $id "set env \"$assignment\""
         expect -i $id -exact $prompt_cmd
     }
 
     # Run a node/RTP on the given channel and expect its completion marker
     # 'count' times (default 5).
     proc run_node {id cmd marker {count 5}} {
-        send -i $id "$cmd\r"
+        send_cmd $id "$cmd"
         for {set i 0} {$i < $count} {incr i} {
             expect -i $id -exact $marker
         }
