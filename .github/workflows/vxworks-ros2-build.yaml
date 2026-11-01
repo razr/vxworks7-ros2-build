@@ -297,37 +297,31 @@ jobs:
           name: HDD image ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
 
       - name: Install QEMU and expect
-        env:
-          SDK: ${{ needs.build.outputs.sdk }}
         run: |
           sudo apt-get update
-          sudo apt-get install -y expect uml-utilities
+          # x86_64 (distro) + aarch64. For aarch64 we use the PATCHED qemu from
+          # razr/qemu-raspi4-deb (BCM2838 GENET + SD->emmc2 routing that VxWorks
+          # raspi4b needs; distro qemu-system-aarch64 lacks these). The .deb
+          # installs /usr/bin/qemu-system-aarch64-raspi4; symlink it to the normal
+          # qemu-system-aarch64 name so the harness (qemu_bin) finds it.
+          sudo apt-get install -y expect uml-utilities qemu-system-x86
 
-          if [ "$SDK" = "raspberrypi4b" ]; then
-            # raspi4b is aarch64 and needs the PATCHED qemu (BCM2838 GENET + SD->
-            # emmc2 routing) from razr/qemu-raspi4-deb -- distro qemu lacks these.
-            # Fetch the latest release's .deb directly (public repo, no token):
-            # resolve the asset URL via the public API, then curl it. Resolving
-            # the URL (rather than hardcoding the version+sha filename) survives
-            # version bumps.
-            mkdir -p /tmp/qemu-raspi4
-            deb_url=$(curl -fsSL https://api.github.com/repos/razr/qemu-raspi4-deb/releases/latest \
-              | grep -oE 'https://[^"]*/qemu-raspi4_[^"]*_amd64\.deb' | head -1)
-            echo "qemu-raspi4 deb: $deb_url"
-            curl -fL -o /tmp/qemu-raspi4/qemu-raspi4.deb "$deb_url"
-            sudo apt-get install -y /tmp/qemu-raspi4/qemu-raspi4.deb
-            qemu-system-aarch64-raspi4 --version | head -1
-          else
-            # x86_64: distro qemu + KVM.
-            sudo apt-get install -y qemu-system-x86
-            # /dev/kvm is crw-rw---- root:kvm and `usermod -aG kvm` does not apply
-            # to the running job shell, so -enable-kvm fails with "Permission
-            # denied". Make the device accessible now (qemu.exp falls back to TCG
-            # if it still is not writable).
-            sudo usermod -aG kvm "$USER" || true
-            if [ -e /dev/kvm ]; then sudo chmod 0666 /dev/kvm || true; fi
-            ls -l /dev/kvm || echo "no /dev/kvm on this runner (tests will run under TCG)"
-          fi
+          deb_url=$(curl -fsSL https://api.github.com/repos/razr/qemu-raspi4-deb/releases/latest \
+            | grep -oE 'https://[^"]*/qemu-raspi4_[^"]*_amd64\.deb' | head -1)
+          echo "qemu-raspi4 deb: $deb_url"
+          curl -fL -o /tmp/qemu-raspi4.deb "$deb_url"
+          sudo apt-get install -y /tmp/qemu-raspi4.deb
+          sudo ln -sf /usr/bin/qemu-system-aarch64-raspi4 /usr/local/bin/qemu-system-aarch64
+          qemu-system-aarch64 --version | head -1
+
+          # KVM for the x86 target: /dev/kvm is crw-rw---- root:kvm and
+          # `usermod -aG kvm` does not apply to the running job shell, so
+          # -enable-kvm fails with "Permission denied". Make the device accessible
+          # now (qemu.exp falls back to TCG if it still is not writable; aarch64
+          # always runs TCG).
+          sudo usermod -aG kvm "$USER" || true
+          if [ -e /dev/kvm ]; then sudo chmod 0666 /dev/kvm || true; fi
+          ls -l /dev/kvm || echo "no /dev/kvm on this runner (x86 tests run under TCG)"
 
           # tap0 for the target NIC (both targets use 192.168.200.254 on the host)
           sudo tunctl -u $USER -t tap0
@@ -340,12 +334,9 @@ jobs:
           # Change directory to GitHub workspace
           cd ${{ github.workspace }}
 
-          if [ "$SDK" = "raspberrypi4b" ]; then
-            # Point the harness at the patched aarch64 emulator and the rpi4
-            # target; the dtb was staged next to the kernel by the build job.
-            export VX_TARGET=rpi4
-            export VX_QEMU=qemu-system-aarch64-raspi4
-          fi
+          # Select the harness target from the built SDK: raspberrypi4b -> rpi4
+          # (aarch64; kernel uVxWorks + rpi-4b.dtb staged beside it), else x86.
+          [ "$SDK" = "raspberrypi4b" ] && export VX_TARGET=rpi4
 
           # Run tests. The HDD-image artifact preserves its build-job path, so the
           # downloaded image is at ./output/ros2.img (the Makefile canonical
