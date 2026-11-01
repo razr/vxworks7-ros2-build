@@ -91,4 +91,30 @@ namespace eval vxworks {
             expect -i $id -exact $marker
         }
     }
+
+    # Ensure the target wall clock is set. QEMU has no RTC, so VxWorks boots with
+    # an unset clock (epoch -> "... 1970"). A 1970 clock breaks time-sensitive
+    # features -- notably SROS2/Fast-DDS X.509 validation, which rejects the CA
+    # cert as "certificate is not yet valid" because its notBefore is far in the
+    # future relative to 1970. Read 'date'; only if it reports 1970 (i.e. unset)
+    # set the target date + time from the host via the command-shell setters
+    #   date "YYYY-MM-DD"   /   time "HH:MM:SS"
+    # If the clock already has a real year (e.g. an RTC-backed board), leave it.
+    proc set_clock {id} {
+        variable prompt_cmd
+        send_cmd $id "date"
+        expect -i $id -exact $prompt_cmd
+        if {[string match "*1970*" $expect_out(buffer)]} {
+            set now [clock seconds]
+            set d [clock format $now -format "%Y-%m-%d"]
+            set t [clock format $now -format "%H:%M:%S"]
+            puts "target clock unset (1970); setting from host: $d $t"
+            send_cmd $id "date \"$d\""
+            expect -i $id -exact $prompt_cmd
+            send_cmd $id "time \"$t\""
+            expect -i $id -exact $prompt_cmd
+        } else {
+            puts "target clock already set; leaving it"
+        }
+    }
 }

@@ -143,6 +143,10 @@ namespace eval qemu {
                     -i $spawn_id -re $vxworks::prompt_kernel {
                         # kernel shell reached; switch to the command shell
                         vxworks::enter_cmd_shell $spawn_id
+                        # QEMU has no RTC -> clock boots unset (1970). Set it from
+                        # the host so time-sensitive tests (SROS2 cert validation)
+                        # work. No-op if the target already has a real clock.
+                        vxworks::set_clock $spawn_id
                     }
                     timeout {
                         puts "Timeout: Did not receive -> symbols."
