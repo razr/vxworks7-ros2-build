@@ -111,9 +111,22 @@ namespace eval qemu {
                 -sd $img_path \
                 -serial null -serial mon:stdio
         } else {
-            # x86_64 q35: KVM-accelerated; bootline via -append; SD image as AHCI disk.
-            puts "Booting x86_64 (q35, KVM) qemu=$qemu kernel=$kernel"
-            spawn $qemu -enable-kvm -smp 8 -m 2G -machine q35 -cpu Nehalem -kernel $kernel \
+            # x86_64 q35: bootline via -append; SD image as AHCI disk.
+            # Use KVM acceleration only when /dev/kvm is present AND writable by
+            # this process; otherwise fall back to pure software emulation (TCG)
+            # so the tests run natively on hosts/runners without KVM access
+            # (e.g. GitHub-hosted runners). TCG is slower -- see the timeout note.
+            if {[file exists "/dev/kvm"] && [file writable "/dev/kvm"]} {
+                set accel {-enable-kvm}
+                set cpu {Nehalem}
+                set mode "KVM"
+            } else {
+                set accel {}
+                set cpu {max}
+                set mode "TCG (no KVM access)"
+            }
+            puts "Booting x86_64 (q35, $mode) qemu=$qemu kernel=$kernel"
+            spawn $qemu {*}$accel -smp 8 -m 2G -machine q35 -cpu $cpu -kernel $kernel \
                 -net nic -net tap,ifname=tap0,script=no,downscript=no \
                 -display none -serial mon:stdio \
                 -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 g=192.168.200.254 u=ftp pw=ftp123 o=gei0 s=/ata0/vxscript" \

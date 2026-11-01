@@ -297,8 +297,16 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y qemu-system-x86 expect
 
-          # Add user to kvm group
-          sudo usermod -aG kvm $USER
+          # KVM access: /dev/kvm exists on the runner but is crw-rw---- root:kvm,
+          # and `usermod -aG kvm` does NOT apply to the already-running job shell
+          # (group membership only takes effect in a new login session) -- which
+          # is why -enable-kvm failed with "Could not access KVM kernel module:
+          # Permission denied". Make the device accessible to this process now so
+          # QEMU can use KVM acceleration. (qemu.exp falls back to TCG software
+          # emulation automatically if /dev/kvm is still not writable.)
+          sudo usermod -aG kvm "$USER" || true
+          if [ -e /dev/kvm ]; then sudo chmod 0666 /dev/kvm || true; fi
+          ls -l /dev/kvm || echo "no /dev/kvm on this runner (tests will run under TCG)"
 
           # Setup tun
           sudo apt-get install uml-utilities
