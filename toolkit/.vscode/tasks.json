@@ -1,5 +1,5 @@
 {
-  // VS Code tasks for the ROS 2 VxWorks SDK kit.
+  // VS Code tasks for the ROS 2 VxWorks toolkit.
   //
   //   Terminal > Run Task... :
   //     "colcon build (vxworks)"  - cross-build the workspace for VxWorks

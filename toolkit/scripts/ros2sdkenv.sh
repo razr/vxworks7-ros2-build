@@ -1,28 +1,28 @@
 #!/usr/bin/env bash
 # ros2sdkenv.sh - source this to set up the environment for building ROS 2
-# packages against this kit's SDK.
+# packages against this toolkit's SDK.
 #
 #   source ros2sdkenv.sh
 #   ros2 pkg create --build-type ament_cmake my_app ...
 #   colcon build --mixin vxworks
 #
-# Must be SOURCED, not executed. Idempotent. Derives everything from the kit
-# location, so the kit works wherever it is unpacked.
+# Must be SOURCED, not executed. Idempotent. Derives everything from the toolkit
+# location, so the toolkit works wherever it is unpacked.
 
-# --- locate the kit + the VxWorks SDK ---------------------------------------
+# --- locate the toolkit + the VxWorks SDK ---------------------------------------
 # Kit dir: honor $TOOLKIT or $KIT (dev container), else derive from this script.
 _src="${BASH_SOURCE[0]:-$0}"
-KIT_DIR="${TOOLKIT:-${KIT:-$(cd "$(dirname "$_src")/.." && pwd)}}"
-export ROS2SDK_KIT="$KIT_DIR"
+TOOLKIT_DIR="${TOOLKIT:-${KIT:-$(cd "$(dirname "$_src")/.." && pwd)}}"
+export ROS2SDK_TOOLKIT="$TOOLKIT_DIR"
 
 _err() { echo "ros2sdkenv: $*" >&2; }
 
-[ -d "$KIT_DIR/export/root" ] || { _err "no root/ in $KIT_DIR (the ROS 2 SDK)"; return 1 2>/dev/null || exit 1; }
+[ -d "$TOOLKIT_DIR/export/root" ] || { _err "no root/ in $TOOLKIT_DIR (the ROS 2 SDK)"; return 1 2>/dev/null || exit 1; }
 
 # The vanilla Wind River SDK is provided by the USER. Resolve it from, in order:
 #   $WRSDK (dev container mount / explicit), $WIND_SDK_HOME (already sourced),
-#   or a bundled $KIT_DIR/wrsdk (standalone kits that choose to include it).
-SDK_DIR="${WRSDK:-${WIND_SDK_HOME:-$KIT_DIR/wrsdk}}"
+#   or a bundled $TOOLKIT_DIR/wrsdk (standalone toolkits that choose to include it).
+SDK_DIR="${WRSDK:-${WIND_SDK_HOME:-$TOOLKIT_DIR/wrsdk}}"
 [ -f "$SDK_DIR/sdkenv.sh" ] || { _err "no VxWorks SDK at '$SDK_DIR' (set WRSDK to your SDK, or mount it)"; return 1 2>/dev/null || exit 1; }
 
 # --- 1) the VxWorks SDK cross toolchain + host tools ------------------------
@@ -46,7 +46,7 @@ export COLCON_PYTHON_EXECUTABLE="$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/pyth
 _saved_ld="${LD_LIBRARY_PATH:-}"
 set +u
 # shellcheck disable=SC1091
-source "$KIT_DIR/export/root/setup.bash"
+source "$TOOLKIT_DIR/export/root/setup.bash"
 set -u 2>/dev/null || true
 # restore the host loader path (drop whatever setup.bash prepended)
 if [ -n "$_saved_ld" ]; then export LD_LIBRARY_PATH="$_saved_ld"; else unset LD_LIBRARY_PATH; fi
@@ -58,34 +58,31 @@ unset _saved_ld
 # (provides just rclpy.executors.ExternalShutdownException) so host-only verbs
 # like `ros2 pkg create` work. Verified NOT to affect `colcon build --mixin
 # vxworks` (a C++ node build does not import host rclpy).
-export PYTHONPATH="$KIT_DIR/host-shims:${PYTHONPATH:-}"
+export PYTHONPATH="$TOOLKIT_DIR/host-shims:${PYTHONPATH:-}"
 
-# --- 4) register the vxworks colcon mixin so `--mixin vxworks` works ---------
-export COLCON_HOME="$KIT_DIR/.colcon"
-mkdir -p "$COLCON_HOME/mixin/default"
-cat > "$COLCON_HOME/mixin/default/vxworks.mixin" <<EOF
-{
-  "build": {
-    "vxworks": {
-      "cmake-force-configure": true,
-      "cmake-args": [
-        "-DCMAKE_FIND_ROOT_PATH=$KIT_DIR/export/root",
-        "-DCMAKE_BUILD_TYPE:STRING=Release",
-        "-DCMAKE_CXX_STANDARD=17",
-        "-DCMAKE_TOOLCHAIN_FILE=$WIND_CC_SYSROOT/mk/toolchain.cmake",
-        "-DCMAKE_MAKE_PROGRAM:FILEPATH=$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/make",
-        "-DPython3_EXECUTABLE=$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3",
-        "-DPYTHON_SOABI=cpython-39-vxworks",
-        "-DCMAKE_EXE_LINKER_FLAGS=-rpath-link $KIT_DIR/export/root/lib",
-        "--no-warn-unused-cli"
-      ]
-    }
-  }
-}
-EOF
+# --- 4) use the vxworks colcon mixin shipped in the ROS 2 SDK ----------------
+# The mixins (vxworks / warnings-low / build-testing) are the ONES THE MAIN
+# BUILD USED -- they ship in export/root/.colcon/mixin/default/. ros2sdk-prepare.sh
+# relocated their build-time absolute paths (/work, /wrsdk) to this toolkit + SDK, so
+# we just point COLCON_HOME at them. Single source of truth: no regeneration here.
+export COLCON_HOME="$TOOLKIT_DIR/export/root/.colcon"
+_vxmixin="$COLCON_HOME/mixin/default/vxworks.mixin"
+if [ ! -f "$_vxmixin" ]; then
+  _err "no vxworks mixin at $_vxmixin -- run scripts/ros2sdk-prepare.sh first"
+elif grep -q '/work/' "$_vxmixin"; then
+  _err "vxworks mixin has un-relocated build paths (/work) -- re-run scripts/ros2sdk-prepare.sh"
+fi
+unset _vxmixin
+
+# Rust (rclrs): nothing to set here. The SDK's sdkenv.sh (sourced above) already
+# runs rustenv.linux, which exports CARGO_HOME=$WIND_CC_SYSROOT/usr/rust/.cargo
+# (the generic VxWorks cargo config: crt-static off, --sysroot, [build] target).
+# The ROS 2-specific cargo config (rclrs/rosidl_runtime_rs + install-lib link
+# flags) is a WORKSPACE file placed at $WS/.cargo/config.toml by the self-test /
+# the user; cargo merges it with the CARGO_HOME config. Do NOT override CARGO_HOME.
 
 echo "ros2sdkenv: ready."
-echo "  kit:    $KIT_DIR"
+echo "  toolkit:    $TOOLKIT_DIR"
 echo "  SDK:    $WIND_SDK_HOME"
-echo "  ROS 2:  $KIT_DIR/export/root  (CMAKE_FIND_ROOT_PATH)"
+echo "  ROS 2:  $TOOLKIT_DIR/export/root  (CMAKE_FIND_ROOT_PATH)"
 echo "  mixin:  vxworks  (colcon mixin list)"

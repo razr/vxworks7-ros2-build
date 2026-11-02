@@ -10,6 +10,13 @@ include $(WIND_USR_MK)/defs.python.mk
 include $(WIND_USR_MK)/defs.fs.mk
 include $(WIND_USR_MK)/defs.image.mk
 include $(WIND_USR_MK)/defs.toolkit.mk
+include $(WIND_USR_MK)/defs.info.mk
+include $(WIND_USR_MK)/defs.examples.mk
+
+# The included modules define file rules (e.g. $(ROS2_IMG) in defs.image.mk)
+# that make reads BEFORE `all` below; the first explicit rule would otherwise
+# become the default goal. Pin it so a bare `make` always builds everything.
+.DEFAULT_GOAL := all
 
 ifeq ($(ROS_DISTRO),)
 $(error Please export ROS_DISTRO)
@@ -25,10 +32,29 @@ DEFAULT_BUILD ?= sdk unixextra ros2
 endif
 endif
 
-.PHONY: examples
+.PHONY: examples image fs toolkit info
 
 all: $(DOWNLOADS_DIR) $(STAMP_DIR) $(EXPORT_DIR)
 	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.install || exit 1; done;
+
+# fs - lay out export/deploy from the built packages (defs.fs.mk::fs_deploy).
+fs: all
+	$(call fs_deploy)
+
+# image - pack the bootable FAT32 ros2.img (defs.image.mk::build_fs).
+image: fs $(ROS2_IMG)
+
+# toolkit - assemble the ROS 2 VxWorks SDK delivery kit (defs.toolkit.mk::build_toolkit).
+toolkit:
+	$(call build_toolkit)
+
+# examples - build the example container images (defs.examples.mk::build_examples).
+examples: fs
+	$(call build_examples)
+
+# info - print the resolved build configuration (defs.info.mk::print_info).
+info:
+	$(call print_info)
 
 $(EXPORT_DIR):
 	@mkdir -p $(ROOT_DIR)
@@ -52,40 +78,4 @@ distclean: clean
 clean: clean_buildstamps
 	for p in $(DEFAULT_BUILD); do rm -rf $(BUILD_DIR)/$$p; done;
 
-examples: fs
-	@set -e; \
-	for f in examples/Dockerfile.*; do \
-		tag=$$(basename $$f | cut -d. -f2); \
-		echo "🚧 Building image for '$$tag'..."; \
-		buildah bud \
-			--arch amd64 \
-			--os vxworks \
-			-f $$f \
-			-t $$tag $(DEPLOY_DIR); \
-	done;
-	@echo "✅ All example images built successfully!"
-	$(TOUCH) $(STAMP_DIR)/$@.build
-
-info:
-	@$(ECHO) "DEFAULT_BUILD:      $(DEFAULT_BUILD)"
-	@$(ECHO) "WIND RELEASE:       $(WIND_RELEASE_ID)"
-	@$(ECHO) "ROS DISTRO:         $(ROS_DISTRO)"
-	@$(ECHO) "TARGET BSP:         $(TGT_BSP)"
-	@$(ECHO) "TARGET ARCH:        $(TGT_ARCH)"
-	@$(ECHO) "TARGET PYTHON:      Python3.$(TGT_PYTHON_MINOR)"
-	@$(ECHO) "TARGET SOABI:       $(Python_SOABI)"
-	@$(ECHO) "HOST PYTHON:        `which python3`"
-	@$(ECHO) "CMAKE:              `which cmake`"
-	@$(ECHO) "CCACHE:             $(if $(CCACHE_DIR),on (CCACHE_DIR=$(CCACHE_DIR)),off (set CCACHE_DIR to enable))"
-	@$(ECHO) "CURDIR:             $(CURDIR)"
-	@$(ECHO) "DOWNLOADS_DIR:      $(DOWNLOADS_DIR)"
-	@$(ECHO) "PACKAGE_DIR:        $(PACKAGE_DIR)"
-	@$(ECHO) "BUILD_DIR:          $(BUILD_DIR)"
-	@$(ECHO) "EXPORT_DIR:         $(EXPORT_DIR)"
-	@$(ECHO) "ROOT_DIR:           $(ROOT_DIR)"
-	@$(ECHO) "DEPLOY_DIR:         $(DEPLOY_DIR)"
-	@$(ECHO) "WIND_CC_SYSROOT:    $(WIND_CC_SYSROOT)"
-	@$(ECHO) "WIND_SDK_HOST_TOOLS:$(WIND_SDK_HOST_TOOLS)"
-	@$(ECHO) "3PP_DEPLOY_DIR:     $(3PP_DEPLOY_DIR)"
-	@$(ECHO) "3PP_DEVELOP_DIR:    $(3PP_DEVELOP_DIR)"
 

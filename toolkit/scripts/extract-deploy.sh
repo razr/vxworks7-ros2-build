@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# extract-deploy.sh - extract the target rootfs (deploy tree) from the kit's
+# extract-deploy.sh - extract the target rootfs (deploy tree) from the toolkit's
 # ros2.img into a directory, so you can inspect or customize it and then repack
 # with make-image.sh. Uses mtools (mcopy) - no sudo/mount needed.
 #
 #   extract-deploy.sh [<dest-dir>]      # default: ./deploy
 set -euo pipefail
 
-KIT_DIR="${KIT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}"
-IMG="${VX_IMG:-$KIT_DIR/ros2.img}"
+TOOLKIT_DIR="${TOOLKIT:-${KIT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}}"
+IMG="${VX_IMG:-$TOOLKIT_DIR/ros2.img}"
 DEST="${1:-./deploy}"
 
 [ -f "$IMG" ] || { echo "no ros2.img at $IMG"; exit 1; }

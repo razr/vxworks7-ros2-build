@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""gen-release-notes.py - render a kit's RELEASE_NOTES.md.
+"""gen-release-notes.py - render a toolkit's RELEASE_NOTES.md.
 
 Combines the auto-generated identity (from manifest.json) with a curated
 fragment (RELEASE_NOTES.in.md: Use / Features / Known limitations).

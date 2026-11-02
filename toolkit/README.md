@@ -1,7 +1,7 @@
-# ROS 2 VxWorks SDK
+# ROS 2 VxWorks Toolkit
 
-A development kit for building **ROS 2 applications for VxWorks** and running
-them on QEMU.
+A toolkit for building **ROS 2 applications for VxWorks** and running them on
+QEMU.
 
 It ships:
 
@@ -11,12 +11,24 @@ It ships:
 - a containerized **dev environment** (`.devcontainer/`) + VS Code tasks (`.vscode/`)
 - helper **scripts** (`scripts/`) — prepare, env, build, run on QEMU
 
-> This kit does **not** include the VxWorks SDK (Wind River licensed).
-> Download/install your vanilla `wrsdk-vxworks7-qemu` yourself and point the kit
-> at it (mounted into the dev container). The kit is not publicly redistributable
-> together with the SDK.
+> This toolkit does **not** include the VxWorks SDK (Wind River licensed).
+> Download/install your vanilla `wrsdk-vxworks7-qemu` yourself and point the
+> toolkit at it (mounted into the dev container). The toolkit is not publicly
+> redistributable together with the SDK.
 
-## What's in the kit
+## Unpack the toolkit
+
+The toolkit ships as a single tarball. Extract it anywhere you like (it is
+relocatable); everything below runs from the unpacked directory:
+
+```bash
+tar -xf ros2-vxworks-<release>-<distro>-<arch>.tar.zst   # or .tar.gz
+cd ros2-vxworks-<release>-<distro>-<arch>/               # the toolkit root
+```
+
+All paths in this document are relative to that toolkit root.
+
+## What's in the toolkit
 
 | Path | What |
 |------|------|
@@ -26,6 +38,7 @@ It ships:
 | `.devcontainer/` | VS Code Dev Container config |
 | `scripts/ros2sdkenv.sh` | source to set up the build env (toolchain + ROS 2 SDK + `vxworks` mixin) |
 | `scripts/ros2sdk-prepare.sh` | one-time: relocate the ROS 2 SDK to this location + sanity-check |
+| `scripts/selftest-build.sh` | build + deploy a C++/Rust/Python hello-world to verify the toolkit (`--lang`) |
 | `scripts/run-qemu.sh` | boot `ros2.img`; `--usb <dir>` attaches your binary as `/bd0a` |
 | `scripts/extract-deploy.sh` / `make-image.sh` | extract / rebuild `ros2.img` |
 | `scripts/generate-manifest.py` | (re)generate `manifest.json` |
@@ -35,14 +48,14 @@ It ships:
 ## Quick start — VS Code Dev Container (recommended)
 
 1. Install Docker + the VS Code **Dev Containers** extension.
-2. Unpack your vanilla VxWorks SDK and tell the kit where it is — create
+2. Unpack your vanilla VxWorks SDK and tell the toolkit where it is — create
    `.devcontainer/.env`:
    ```
    WRSDK=/absolute/path/to/wrsdk-vxworks7-qemu
    ```
-3. Open the kit folder in VS Code → **"Dev Containers: Reopen in Container"**.
+3. Open the toolkit folder in VS Code → **"Dev Containers: Reopen in Container"**.
    It builds the `vxbuild` → `vxros2build` images, mounts your SDK at `/wrsdk`
-   and the kit at `/kit`, and sets up the build env on attach.
+   and the toolkit at `/kit`, and sets up the build env on attach.
 4. In the container terminal:
    ```bash
    ros2 pkg create --build-type ament_cmake my_app
@@ -58,7 +71,7 @@ docker build -t vxbuild:26.04        docker/vxbuild
 docker build -t vxros2build:lyrical  --build-arg BASE_IMAGE=vxbuild:26.04 \
                                      --build-arg ROS_DISTRO=lyrical docker/vxros2build
 
-# run it: mount YOUR vanilla SDK + this kit + your workspace
+# run it: mount YOUR vanilla SDK + this toolkit + your workspace
 docker run -it --rm \
   -v /path/to/wrsdk-vxworks7-qemu:/wrsdk \
   -v "$PWD":/kit \
@@ -86,6 +99,30 @@ colcon build --mixin vxworks
 
 `colcon build --mixin vxworks` cross-compiles against the ROS 2 SDK and produces
 a **VxWorks RTP** linked against the SDK's libraries (e.g. `librclcpp.so`).
+
+## C++, Rust, Python nodes
+
+```bash
+ros2 pkg create --build-type ament_cmake  my_cpp     # C++  (rclcpp)
+ros2 pkg create --build-type ament_cargo  my_rust    # Rust (rclrs) — add <depend>rclrs</depend>
+ros2 pkg create --build-type ament_python my_py      # Python (rclpy, runs on target)
+colcon build --mixin vxworks --packages-select my_cpp
+```
+
+Rust needs the toolkit's Rust support (shipped only if built with `ROS2_RUST`):
+the ROS 2 crate sources in `export/root/share/*/rust` + the cargo config
+`ros2sdk-prepare.sh` renders. The generic VxWorks cargo settings come from the
+SDK (`CARGO_HOME`, set when you source the SDK env).
+
+## Verify the toolkit (self-test)
+
+```bash
+./scripts/selftest-build.sh                 # all langs (default); or --lang cpp|rust|python
+```
+
+Builds+deploys a hello-world per language into `ros2.img` and prints the
+`expect …/tests/main_script.exp <img> …` command for the on-target checks
+(`test09`/`test10`/`test11`). Keeps the work dir by default; `--clean` removes it.
 
 ## Run your app on VxWorks/QEMU
 
@@ -129,6 +166,7 @@ commits) that were imported.
 
 ## License
 
-Kit scripts and docs: Apache-2.0. The ROS 2 SDK (`root/`) is built from
-open-source ROS 2 + the Wind River ROS 2 layer. The **Wind River VxWorks SDK is
-not included** and is subject to Wind River's license — obtain it from Wind River.
+Toolkit scripts and docs: Apache-2.0. The ROS 2 SDK (`export/root/`) is built
+from open-source ROS 2 + the Wind River ROS 2 layer. The **Wind River VxWorks SDK
+is not included** and is subject to Wind River's license — obtain it from Wind
+River.

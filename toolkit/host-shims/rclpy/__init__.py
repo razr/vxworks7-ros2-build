@@ -1,4 +1,4 @@
-# Host-side rclpy STUB for the ROS 2 VxWorks SDK kit.
+# Host-side rclpy STUB for the ROS 2 VxWorks SDK toolkit.
 #
 # The real rclpy in export/root is built for the TARGET (VxWorks) and its C
 # extension (_rclpy_pybind11) cannot load on the build host. The host `ros2`

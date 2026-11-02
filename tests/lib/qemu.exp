@@ -88,6 +88,22 @@ namespace eval qemu {
         return "qemu-system-x86_64"
     }
 
+    # Optional USB mass-storage: if VX_USB names a host directory, attach it as a
+    # FAT USB disk (-> /bd0a on target) via QEMU's file=fat:rw:<dir>. This lets a
+    # caller run binaries from the USB dir WITHOUT modifying ros2.img (keeps the
+    # image pristine -- used by the toolkit self-test). Mirrors run-qemu.sh --usb.
+    proc usb_args {} {
+        if {![info exists ::env(VX_USB)] || $::env(VX_USB) eq ""} { return {} }
+        set dir $::env(VX_USB)
+        if {![file isdirectory $dir]} {
+            puts "VX_USB set but not a directory: $dir -- ignoring"
+            return {}
+        }
+        puts "Attaching VX_USB $dir as USB mass storage -> /bd0a on target"
+        return [list -usb -device usb-ehci,id=ehci -device usb-storage,drive=fat32 \
+                     -drive "file=fat:rw:$dir,id=fat32,format=raw,if=none"]
+    }
+
     # Spawn QEMU with the given ros2 disk image, wait for the boot to reach the
     # kernel shell prompt, then drop to the command shell.
     # Returns the serial spawn id (also stored in ::qemu::spawn_id).
@@ -95,6 +111,7 @@ namespace eval qemu {
         variable spawn_id
         set kernel [find_kernel]
         set qemu [qemu_bin]
+        set usb [usb_args]
 
         if {[target] eq "rpi4"} {
             # aarch64 raspi4b: stock SDK dtb + bootline via -append (-> /chosen/bootargs
@@ -109,7 +126,7 @@ namespace eval qemu {
                 -append "$bootline" \
                 -nic tap,ifname=tap0,model=bcm2838-genet,script=no,downscript=no \
                 -sd $img_path \
-                -serial null -serial mon:stdio
+                -serial null -serial mon:stdio {*}$usb
         } else {
             # x86_64 q35: bootline via -append; SD image as AHCI disk.
             # Use KVM acceleration only when /dev/kvm is present AND writable by
@@ -132,7 +149,7 @@ namespace eval qemu {
                 -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 g=192.168.200.254 u=ftp pw=ftp123 o=gei0 s=/ata0/vxscript" \
                 -device ich9-ahci,id=ahci \
                 -drive file=$img_path,if=none,id=ros2disk,format=raw \
-                -device ide-hd,drive=ros2disk,bus=ahci.0
+                -device ide-hd,drive=ros2disk,bus=ahci.0 {*}$usb
         }
         # 'variable spawn_id' above aliases the local name to the namespace var,
         # so 'spawn' writes the id straight into ::qemu::spawn_id.

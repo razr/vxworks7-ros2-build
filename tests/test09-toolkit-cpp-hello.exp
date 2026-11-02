@@ -1,0 +1,30 @@
+# test09-toolkit-cpp-hello - on-target half of the SDK-toolkit self-test (C++).
+#
+# The HOST half (toolkit/scripts/selftest-build.sh --lang cpp) cross-built an
+# ament_cmake node for VxWorks and staged it on a USB dir attached as /bd0a (via
+# VX_USB) -- so ros2.img is NOT modified. The merged install tree puts the binary
+# at /bd0a/lib/hello_cpp/hello_cpp. This runs it and asserts the marker.
+#
+# If the USB dir was not attached (VX_USB unset) the binary is absent; we detect
+# that and SKIP rather than hang, so a normal image run of the suite is unaffected.
+proc test09-toolkit-cpp-hello {} {
+    puts "\nTEST: SDK-toolkit C++ hello (toolkit self-test)"
+
+    # Point the loader + ament index at /bd0a (plus the baked /usr base). A
+    # toolkit-built RTP links ROS 2 .so deps that live under /bd0a/lib; keep /usr
+    # so base libs still resolve. (Same env contract as the Rust/Python self-tests.)
+    vxworks::set_env $qemu::spawn_id "AMENT_PREFIX_PATH=/usr:/bd0a"
+    vxworks::set_env $qemu::spawn_id "LD_LIBRARY_PATH=/usr/lib:/bd0a/lib"
+    vxworks::send_cmd $qemu::spawn_id "/bd0a/lib/hello_cpp/hello_cpp"
+    expect {
+        -exact {Hello from C++, world!} {
+            puts "PASS test09: toolkit-built C++ RTP printed the marker"
+        }
+        -re {Can't open file|No such file or directory|INSTANTIATE_FAILED} {
+            puts "test09 SKIP: /bd0a/lib/hello_cpp/hello_cpp not present (run selftest-build.sh --lang cpp + boot with VX_USB)"
+        }
+        timeout {
+            puts "FAIL test09: timed out waiting for the marker from hello_cpp"
+        }
+    }
+}

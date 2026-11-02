@@ -18,7 +18,7 @@
 # TOOLKIT_BUILD   = where the kit is staged + tarred (under output/).
 TOOLKIT_SRC_DIR ?= $(CURDIR)/toolkit
 TOOLKIT_BUILD   ?= $(TOP_BUILDDIR)/toolkit-build
-TOOLKIT_NAME    ?= ros2-vxworks-sdk-kit-$(ROS_DISTRO)-$(TGT_ARCH)
+TOOLKIT_NAME    ?= ros2-vxworks-$(WIND_RELEASE_ID)-$(ROS_DISTRO)-$(TGT_ARCH)
 TOOLKIT_STAGE   ?= $(TOOLKIT_BUILD)/$(TOOLKIT_NAME)
 TOOLKIT_TARBALL ?= $(TOP_BUILDDIR)/$(TOOLKIT_NAME).tar.zst
 TOOLKIT_ASSEMBLE?= $(TOOLKIT_SRC_DIR)/make-toolkit.sh
@@ -39,9 +39,14 @@ TOOLKIT_LAYER_COMMIT    ?=
 # toolkit`) owns producing ros2.img. toolkit/make-toolkit.sh verifies ros2.img
 # exists at $(TOP_BUILDDIR)/ros2.img and fails with a clear message otherwise,
 # so this stays declarative and does not rebuild the image.
-.PHONY: toolkit toolkit-clean toolkit-info
+#
+# The `toolkit` phony target lives in the top-level Makefile and calls the
+# build_toolkit macro below; toolkit-clean / toolkit-info stay here with the vars.
+.PHONY: toolkit-clean toolkit-info
 
-toolkit:
+# build_toolkit - run the kit assembler (make-toolkit.sh) with the build vars in
+# its environment. No args. Consumes export/root, export/deploy, ros2.img.
+define build_toolkit
 	@$(ECHO) "📦 Assembling ROS 2 VxWorks SDK toolkit: $(TOOLKIT_NAME)"
 	TOP_BUILDDIR="$(TOP_BUILDDIR)" \
 	EXPORT_DIR="$(EXPORT_DIR)" ROOT_DIR="$(ROOT_DIR)" DEPLOY_DIR="$(DEPLOY_DIR)" \
@@ -56,6 +61,7 @@ toolkit:
 	TOOLKIT_TARBALL="$(TOOLKIT_TARBALL)" \
 	    bash "$(TOOLKIT_ASSEMBLE)"
 	@$(ECHO) "✅ toolkit: $(TOOLKIT_TARBALL)"
+endef
 
 toolkit-clean:
 	@rm -rf $(TOOLKIT_BUILD) $(TOOLKIT_TARBALL) $(TOP_BUILDDIR)/$(TOOLKIT_NAME).tar.gz

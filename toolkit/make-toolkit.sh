@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# make-toolkit.sh - assemble the ROS 2 VxWorks SDK delivery kit (the `toolkit`
+# make-toolkit.sh - assemble the ROS 2 VxWorks SDK delivery toolkit (the `toolkit`
 # recipe). Invoked by `make toolkit` (mk/usr/defs.toolkit.mk) with these vars in
 # the environment:
 #
@@ -7,8 +7,8 @@
 #   ROS_DISTRO WIND_RELEASE_ID TGT_ARCH WIND_CC_SYSROOT WIND_SDK_HOME
 #   TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL
 #
-# It stages a self-contained kit:
-#   sdk_overlay/      - the SDK delta, generated from AUTHORITATIVE sources
+# It stages a self-contained toolkit:
+#   sdk_overlay/      - the SDK delta, generated from the build inputs
 #                       (buildspecs/cmake, pkg/sdk/files, built unixextra, the
 #                       patched SDK's host bin + rust) - NOT from a diff.
 #   sdk_overlay.json  - inventory of the overlay
@@ -40,8 +40,8 @@ SDK_HOSTBIN="$WIND_SDK_HOME/$HOSTBIN_REL"
 log "staging at $STAGE"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 
-# --- 1) sdk_overlay/ from AUTHORITATIVE sources -----------------------------
-log "1) building sdk_overlay/ (authoritative sources)"
+# --- 1) sdk_overlay/ from the build inputs ----------------------------------
+log "1) building sdk_overlay/"
 
 # 1a) cmake toolchain + Platform  <- buildspecs/cmake (repo)
 install -D -m0644 "$BUILDSPECS_DIR/cmake/toolchain.cmake"        "$OV/$SYSROOT_REL/mk/toolchain.cmake"
@@ -88,7 +88,7 @@ if [ -f "$RUST_SRC/.cargo/config.toml" ]; then
     done
   fi
 else
-  log "   (no rust fixups in SDK - skipping; kit without Rust)"
+  log "   (no rust fixups in SDK - skipping; toolkit without Rust)"
 fi
 
 # --- 2) sdk_overlay.json inventory ------------------------------------------
@@ -120,7 +120,7 @@ install -m0644 "$TOOLKIT_SRC_DIR/requirements.txt" "$STAGE/requirements.txt"
 # inside ros2.img (make image packs it there). Shipping it loose would duplicate
 # the whole target rootfs. extract-deploy.sh can recover it from ros2.img if a
 # user ever needs the loose tree.
-log "4) export/root + ros2.img (copying built artifacts; deploy is inside ros2.img)"
+log "4) export/root + ros2.img (copying built artifacts)"
 [ -d "$ROOT_DIR" ]              || die "export/root missing ($ROOT_DIR) - run 'make'"
 [ -f "$TOP_BUILDDIR/ros2.img" ] || die "ros2.img missing - run 'make image'"
 mkdir -p "$STAGE/export"
@@ -136,12 +136,32 @@ cp -a "$TOOLKIT_SRC_DIR/.vscode"       "$STAGE/.vscode"
 install -m0644 "$TOOLKIT_SRC_DIR/README.md" "$STAGE/README.md"
 find "$STAGE/host-shims" -name __pycache__ -type d -exec rm -rf {} + 2>/dev/null || true
 
+# Rust (rclrs) workspace cargo-config template: ros2sdk-prepare.sh renders it to
+# toolkit paths so a downstream `colcon build` resolves rclrs/rosidl_runtime_rs from
+# the toolkit's export/root/share/*/rust. Only relevant if the build included Rust.
+RUST_TMPL="$PACKAGE_DIR/ros2/files/$ROS_DISTRO/rust-cargo-config.toml.template"
+if [ -f "$RUST_TMPL" ]; then
+  install -D -m0644 "$RUST_TMPL" "$STAGE/scripts/rust-cargo-config.toml.template"
+  log "   staged rust-cargo-config.toml.template (Rust/rclrs support)"
+fi
+
+# convert_console_scripts.py: the main build rewrites setuptools EASY-INSTALL
+# console-script shims (slow pkg_resources working-set scan at startup, also
+# fragile for relocated packages) into fast importlib.metadata wrappers. Ship it
+# so a downstream Python (ament_python) build can convert its own entry scripts
+# and run via `ros2 run` the same way the baked-in packages do.
+CCS="$PACKAGE_DIR/ros2/files/convert_console_scripts.py"
+if [ -f "$CCS" ]; then
+  install -D -m0755 "$CCS" "$STAGE/scripts/convert_console_scripts.py"
+  log "   staged convert_console_scripts.py (Python entry-point fixup)"
+fi
+
 # --- 6) manifest.json (keys == Makefile vars) + layer pin + build commit ----
 log "6) manifest.json"
 PKGMK="$PACKAGE_DIR/ros2/files/$ROS_DISTRO/packages.mk"
 GENMANIFEST="$TOOLKIT_SRC_DIR/scripts/generate-manifest.py"
 # build-repo provenance: the vxworks7-ros2-build commit + describe that produced
-# this kit (so it can be checked out and re-run). Best-effort; empty if not a git
+# this toolkit (so it can be checked out and re-run). Best-effort; empty if not a git
 # tree. A '-dirty' suffix flags uncommitted changes at build time.
 REPO_DIR="$(cd "$PACKAGE_DIR/.." && pwd)"
 BUILD_COMMIT="$(git -C "$REPO_DIR" rev-parse HEAD 2>/dev/null || true)"

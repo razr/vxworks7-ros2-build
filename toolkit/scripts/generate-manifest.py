@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""generate-manifest.py - build the ROS 2 SDK kit manifest from packages.mk.
+"""generate-manifest.py - build the ROS 2 SDK toolkit manifest from packages.mk.
 
 The JSON keys mirror the Makefile variable names 1:1 (ROS2_PATCH_DIRS,
 ROS_IGNORE_*, ROS2_BASE, ROS2_EXAMPLES, ROS2_RUST, ROS2_MIXINS, ROS2_VENDORS),
@@ -54,7 +54,7 @@ def main():
         "vxworks_release": vx_rel,
         "vxworks_sdk": vx_sdk,
         "arch": arch,
-        # the build repo (vxworks7-ros2-build) that produced this kit -- check it
+        # the build repo (vxworks7-ros2-build) that produced this toolkit -- check it
         # out at `build.commit` and re-run `make toolkit` to reproduce.
         "build": {
             "repo": "vxworks7-ros2-build",

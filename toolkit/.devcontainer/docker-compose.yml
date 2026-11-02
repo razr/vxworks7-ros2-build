@@ -1,4 +1,4 @@
-# VS Code Dev Container for the ROS 2 VxWorks SDK kit.
+# VS Code Dev Container for the ROS 2 VxWorks toolkit.
 #
 # Two-stage build (as shipped by the project): vxbuild -> vxros2build.
 # Your (licensed) vanilla Wind River VxWorks SDK is MOUNTED at /wrsdk (never
@@ -29,7 +29,7 @@ services:
     volumes:
       - ${WRSDK:?set WRSDK to your vanilla VxWorks SDK path}:/wrsdk
       - ..:/kit            # the ROS 2 SDK kit (export/root, scripts/, ros2.img, repos/)
-      - ../..:/work        # your workspace (parent of the kit); adjust as needed
+      - ../..:/work        # your workspace (parent of the toolkit); adjust as needed
     environment:
       WRSDK: /wrsdk
       KIT: /kit

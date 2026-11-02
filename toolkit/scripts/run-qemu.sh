@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# run-qemu.sh - boot the kit's ros2.img on VxWorks/QEMU, optionally attaching a
+# run-qemu.sh - boot the toolkit's ros2.img on VxWorks/QEMU, optionally attaching a
 # host directory (e.g. your built RTP) as a USB disk so you can run YOUR binary
 # on the target without repacking the image.
 #
@@ -14,9 +14,9 @@
 # add 192.168.200.254/24 dev tap0; ip link set tap0 up). Quit QEMU with Ctrl-A x.
 set -euo pipefail
 
-KIT_DIR="${TOOLKIT:-${KIT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}}"
-IMG="${VX_IMG:-$KIT_DIR/ros2.img}"
-SDK_DIR="${WRSDK:-${WIND_SDK_HOME:-$KIT_DIR/wrsdk}}"
+TOOLKIT_DIR="${TOOLKIT:-${KIT:-$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")/.." && pwd)}}"
+IMG="${VX_IMG:-$TOOLKIT_DIR/ros2.img}"
+SDK_DIR="${WRSDK:-${WIND_SDK_HOME:-$TOOLKIT_DIR/wrsdk}}"
 
 USB_DIR=""
 while [ $# -gt 0 ]; do
