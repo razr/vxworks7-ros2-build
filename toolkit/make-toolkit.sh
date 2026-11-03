@@ -56,11 +56,20 @@ install -D -m0644 "$UNIXEXTRA_SRC/libunixextra.a"    "$OV/$SYSROOT_REL/usr/lib/c
 install -D -m0755 "$UNIXEXTRA_SRC/libunixextra.so.1" "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.so.1"
 ln -sf libunixextra.so.1 "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.so"
 UX_H="$OV/$SYSROOT_REL/usr/h/published/UTILS_UNIX"
-for h in fcntl.h fnmatch.h pthread.h string.h termios.h; do
-  install -D -m0644 "$UNIXEXTRA_SRC/$h" "$UX_H/$h"
+# Overlay ONLY the UTILS_UNIX headers unixextra ACTUALLY installed into the SDK
+# sysroot -- do NOT hardcode the list from $UNIXEXTRA_SRC. unixextra's install is
+# version-aware (pkg/unixextra/Makefile: for WIND_RELEASE_ID major > 23 it drops
+# pthread_getname.c from SOURCES, so pthread.h is NOT installed because VxWorks
+# libc already provides pthread_getname_np/pthread_setname_np). Copying a fixed
+# list from the source tree re-introduced a stale pthread.h whose const-char*
+# signature conflicts with libc/public pthread.h and breaks find_package(Threads)
+# (e.g. libxml2_vendor). Mirroring the installed set keeps the toolkit in lockstep
+# with unixextra's own version logic -- no duplicated MAJOR_VERSION check to drift.
+UX_SYSROOT_H="$WIND_CC_SYSROOT/usr/h/published/UTILS_UNIX"
+[ -d "$UX_SYSROOT_H" ] || die "unixextra headers not installed in sysroot: $UX_SYSROOT_H (run 'make unixextra' first)"
+( cd "$UX_SYSROOT_H" && find . -name '*.h' -print ) | while IFS= read -r rel; do
+  install -D -m0644 "$UX_SYSROOT_H/$rel" "$UX_H/$rel"
 done
-install -D -m0644 "$UNIXEXTRA_SRC/sys/file.h"    "$UX_H/sys/file.h"
-install -D -m0644 "$UNIXEXTRA_SRC/sys/ttycom.h"  "$UX_H/sys/ttycom.h"
 
 # 1d) cc-conf/default.conf (carries the -lunixextra link edit)  <- patched SDK
 grep -q 'lunixextra' "$WIND_CC_SYSROOT/cc-conf/default.conf" \
