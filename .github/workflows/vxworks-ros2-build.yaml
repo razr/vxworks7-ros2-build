@@ -264,12 +264,15 @@ jobs:
           # stage them on a USB dir (-> /bd0a on target). Runs in the SDK Docker so
           # wr-cc/colcon/cargo are available. Deterministic --workdir under the
           # workspace so the QEMU job can pick up the usb/ tree + toolkit image.
+          # The 'set -- /wrsdk/sdkenv.sh;' prefix is required: the vxbuild entrypoint
+          # runs 'su -c "$*"', which drops the quotes around the bash -c script and
+          # would otherwise run '/bin/bash -c .' ('.: filename argument required').
           docker run --rm \
             -e UID=$(id -u) -e GID=$(id -g) \
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c '. /wrsdk/sdkenv.sh && /work/toolkit/scripts/selftest-build.sh --workdir /work/selftest'
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && /work/toolkit/scripts/selftest-build.sh --workdir /work/selftest'
           echo "--- selftest.env ---"; cat ${{ github.workspace }}/selftest/selftest.env
 
       - name: Toolkit self-test — upload USB stage + toolkit image
