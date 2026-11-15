@@ -200,13 +200,17 @@ log "5) verifying"
 grep -q 'lunixextra' "$WRSDK/vxsdk/sysroot/cc-conf/default.conf" || die "cc-conf/default.conf missing -lunixextra"
 [ -f "$ROOT/share/ament_cmake/cmake/ament_cmakeConfig.cmake" ] || die "export/root/ has no ament_cmake"
 ls "$ROOT"/lib/librclcpp.so* >/dev/null 2>&1 || die "export/root/ has no librclcpp"
-# the vxworks mixin must exist, be relocated (no build-workspace /work/ paths
-# left), be valid JSON, and reference paths that now exist on disk.
+# the vxworks mixin must exist, be relocated (none of the baked build-time roots
+# derived in step 4 left), be valid JSON, and reference paths that now exist on
+# disk. Check the baked roots, not a fixed '/work/' prefix: the toolkit itself may
+# live under /work (CI selftest), so the relocated $ROOT can legitimately start
+# with /work/. OLD_SDK is not checked: it may equal the new SDK root.
 VXMIXIN="$ROOT/.colcon/mixin/default/vxworks.mixin"
 [ -f "$VXMIXIN" ] || die "no vxworks.mixin in export/root/.colcon (toolkit shipped no mixin)"
-if grep -q '/work/' "$VXMIXIN"; then
-  die "vxworks.mixin still has un-relocated build paths (/work): $(grep -Eo '/work[^"]*' "$VXMIXIN" | head -1)"
-fi
+for old in "${OLD_ROOT:-}" "${OLD_TC:-}"; do
+  [ -n "$old" ] && [ "$old" != "$ROOT" ] && grep -qF "$old" "$VXMIXIN" && \
+    die "vxworks.mixin still has un-relocated build paths: $old"
+done
 "$PY" -c "import json,sys; json.load(open(sys.argv[1]))" "$VXMIXIN" || die "vxworks.mixin is not valid JSON after relocation"
 grep -q "$ROOT" "$VXMIXIN" || die "vxworks.mixin does not point at this toolkit's export/root ($ROOT)"
 [ -f "$WIND_SDK_HOME/vxsdk/sysroot/mk/toolchain.cmake" ] || die "toolchain.cmake missing at $WIND_SDK_HOME/vxsdk/sysroot/mk (SDK overlay not applied?)"
