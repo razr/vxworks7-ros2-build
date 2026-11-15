@@ -33,6 +33,37 @@ define sdk_fix
 	else \
 		echo "'defs.autotools.mk' already exists, do not copy."; \
 	fi
+
+	# SDK 26.03 defect: some 3pp libs ship with NO DT_SONAME (their libtool has
+	# no vxworks arm): libsqlite3.so* (no soname at all) and libyaml.so (soname is
+	# the UNVERSIONED "libyaml.so", which dpkg shlibs cannot express). A consumer
+	# then records an absolute-path or unversioned DT_NEEDED -> unloadable on
+	# target + unresolvable by dpkg-shlibdeps. Stamp a proper versioned soname
+	# in-place in BOTH 3pp trees (develop = build/link + sdk_deploy source; deploy
+	# = target image staging) so consumers record a versioned soname NEEDED that
+	# matches the vxworks-lib* shlibs. Idempotent; needs host patchelf.
+	# table: <glob-basename> <soname-to-set> <real-file-name-if-must-create>
+	for ENTRY in "libsqlite3.so:libsqlite3.so.0:libsqlite3.so.0.3.50.4" \
+	             "libyaml.so:libyaml.so.0:libyaml.so.0.2.5"; do \
+		base=$${ENTRY%%:*}; rest=$${ENTRY#*:}; soname=$${rest%%:*}; realname=$${rest#*:}; \
+		for D in $(3PP_DEVELOP_DIR)/usr/lib $(3PP_DEPLOY_DIR)/usr/lib; do \
+			[ -f $$D/$$base ] || continue; \
+			cur=$$(wr-readelf -d $$D/$$base 2>/dev/null | sed -n 's/.*SONAME.*\[\(.*\)\].*/\1/p'); \
+			if [ "$$cur" = "$$soname" ]; then \
+				echo "$$D/$$base already SONAME=$$soname, skip."; continue; \
+			fi; \
+			if ! command -v patchelf >/dev/null 2>&1; then \
+				echo "WARNING: $$D/$$base needs a soname but patchelf is not installed"; continue; \
+			fi; \
+			real=$$(ls $$D/$$base.[0-9]* 2>/dev/null | grep -E '\.so\.[0-9].*[0-9]$$' | head -1); \
+			[ -n "$$real" ] || real=$$D/$$realname; \
+			[ -e "$$real" ] || cp $$D/$$base "$$real"; \
+			patchelf --set-soname $$soname "$$real"; \
+			ln -sf "$$(basename $$real)" $$D/$$soname; \
+			ln -sf $$soname $$D/$$base; \
+			echo "stamped DT_SONAME=$$soname on $$D/$$(basename $$real)"; \
+		done; \
+	done
 endef
 
 define vxworks_fix
