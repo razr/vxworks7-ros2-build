@@ -59,7 +59,7 @@ define sdk_fix
 			[ -n "$$real" ] || real=$$D/$$realname; \
 			[ -e "$$real" ] || cp $$D/$$base "$$real"; \
 			patchelf --set-soname $$soname "$$real"; \
-			ln -sf "$$(basename $$real)" $$D/$$soname; \
+			[ "$$(basename $$real)" = "$$soname" ] || ln -sf "$$(basename $$real)" $$D/$$soname; \
 			ln -sf $$soname $$D/$$base; \
 			echo "stamped DT_SONAME=$$soname on $$D/$$(basename $$real)"; \
 		done; \
