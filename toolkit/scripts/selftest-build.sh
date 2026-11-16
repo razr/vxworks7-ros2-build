@@ -101,7 +101,7 @@ mkdir -p "$WORKDIR"
 USB_DIR="$WORKDIR/usb"; mkdir -p "$USB_DIR"
 # Keep the workdir (USB stage) by default -- the on-target half is a separate
 # command you run next. Pass --clean to delete it instead.
-cleanup() { [ "$CLEAN" = 1 ] && rm -rf "$WORKDIR"; }
+cleanup() { if [ "$CLEAN" = 1 ]; then rm -rf "$WORKDIR"; fi; }
 trap cleanup EXIT
 say "toolkit=$TOOLKIT_SRC  sdk=$SDK  work=$WORKDIR"
 
