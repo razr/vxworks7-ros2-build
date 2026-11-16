@@ -41,7 +41,6 @@ All paths in this document are relative to that toolkit root.
 | `scripts/selftest-build.sh` | build + deploy a C++/Rust/Python hello-world to verify the toolkit (`--lang`) |
 | `scripts/run-qemu.sh` | boot `ros2.img`; `--usb <dir>` attaches your binary as `/bd0a` |
 | `scripts/prepare_python_install.py` | prepare a Python `install/` tree for a fast start on the target (`.pyc` + launcher rewrite) |
-| `scripts/convert_console_scripts.py` | launcher-only rewrite for one directory (compatibility wrapper of the above) |
 | `scripts/extract-deploy.sh` / `make-image.sh` | extract / rebuild `ros2.img` |
 | `scripts/generate-manifest.py` | (re)generate `manifest.json` |
 | `manifest.json` | what was built: distro, VxWorks release, arch, layer pin, package/patch/ignore lists |

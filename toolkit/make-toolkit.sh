@@ -159,13 +159,11 @@ fi
 # EASY-INSTALL launchers (slow pkg_resources scan at startup, also fragile for
 # relocated packages) into importlib.metadata wrappers. Ship it so a downstream
 # Python (ament_python) build prepares its install/ tree the same way.
-# convert_console_scripts.py is its launcher-only compatibility wrapper.
-for s in prepare_python_install.py convert_console_scripts.py; do
-  if [ -f "$PACKAGE_DIR/ros2/files/$s" ]; then
-    install -D -m0755 "$PACKAGE_DIR/ros2/files/$s" "$STAGE/scripts/$s"
-    log "   staged $s (Python fast-start)"
-  fi
-done
+PPI="$PACKAGE_DIR/ros2/files/prepare_python_install.py"
+if [ -f "$PPI" ]; then
+  install -D -m0755 "$PPI" "$STAGE/scripts/prepare_python_install.py"
+  log "   staged prepare_python_install.py (Python fast-start)"
+fi
 
 # --- 6) manifest.json (keys == Makefile vars) + layer pin + build commit ----
 log "6) manifest.json"
