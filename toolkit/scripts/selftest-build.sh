@@ -300,32 +300,19 @@ for lang in $LANGS; do
   esac
 done
 
-# --- 5b) Python: convert the setuptools console-script shim -----------------
-# The ament_python install produces an EASY-INSTALL console script that imports
-# pkg_resources + builds the whole working set at startup -- slow on the target
-# FS and fragile for a package relocated to /bd0a (DistributionNotFound). The
-# toolkit ships convert_console_scripts.py (same fixup the main build applies) to
-# rewrite it into a fast importlib.metadata wrapper, so `ros2 run` works on target.
+# --- 5b) Python: prepare install/ for a fast start on the target -----------
+# Same step the image build runs (python_prepare_deploy): unchecked-hash .pyc
+# (target loads bytecode as-is, never recompiles on its slow FS) and rewrite of
+# the ament_python EASY-INSTALL launcher, which imports pkg_resources + scans the
+# whole working set at startup -- slow on the target FS and fragile for a package
+# relocated to /bd0a (DistributionNotFound) -- into an importlib.metadata wrapper.
 case " $LANGS " in
   *" python "*)
-    CCS="$TOOLKIT_ROOT/scripts/convert_console_scripts.py"
-    if [ -f "$CCS" ] && [ -d "$INSTALL/lib/hello_python" ]; then
-      say "5b) convert_console_scripts.py $INSTALL/lib/hello_python"
-      "$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3" "$CCS" "$INSTALL/lib/hello_python" \
-        || die "[python] convert_console_scripts failed"
-    else
-      say "5b) WARN: convert_console_scripts.py not in toolkit -- ros2 run may hit pkg_resources"
-    fi
-    # Same .pyc step as the image build (python_prepare_deploy): drop whatever
-    # __pycache__ the install wrote (timestamp-checked, may be seen as stale after
-    # the copy to the USB dir) and pre-compile unchecked-hash bytecode with the SDK
-    # host python (same version as the target), so the target loads it as-is and
-    # never recompiles on its slow FS.
-    say "5c) compileall --invalidation-mode unchecked-hash $INSTALL"
-    find "$INSTALL" -type d -name __pycache__ -prune -exec rm -rf {} +
-    "$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3" -m compileall -q -f \
-      --invalidation-mode unchecked-hash "$INSTALL" \
-      || say "5c) WARN: compileall reported errors (target will compile those modules at import)"
+    PPI="$TOOLKIT_ROOT/scripts/prepare_python_install.py"
+    [ -f "$PPI" ] || die "[python] prepare_python_install.py not in toolkit"
+    say "5b) prepare_python_install.py $INSTALL"
+    "$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3" "$PPI" "$INSTALL" \
+      || die "[python] prepare_python_install failed"
     ;;
 esac
 

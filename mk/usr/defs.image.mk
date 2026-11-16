@@ -27,15 +27,12 @@ define build_fs
 	mkfs.vfat -F 32 $(1)
 	mkdir -p $(TOP_BUILDDIR)/mount
 	fusefat -o rw+ $(1) $(TOP_BUILDDIR)/mount
-	# Strip any pre-existing __pycache__ FIRST: build-time caches may be host-arch
-	# (e.g. cpython-312) and are useless/garbage on the target. python_prepare_deploy
-	# (next line) then regenerates clean target cpython-3$(TGT_PYTHON_MINOR) .pyc.
-	find $(TOP_BUILDDIR)/export/deploy -type d -name __pycache__ -prune -exec rm -rf {} +
-	# Prepare the deployed python for the target: pre-compile .pyc (unchecked-hash,
-	# so the target never recompiles on its slow FS) and rewrite the setuptools
-	# EASY-INSTALL console-script shims to importlib.metadata (the pkg_resources
-	# shims scan all *.dist-info at startup -- minutes on the target). Both steps
-	# are defined in mk/usr/defs.python.mk.
+	# Prepare the deployed python for the target (mk/usr/defs.python.mk ->
+	# pkg/ros2/files/prepare_python_install.py): strip __pycache__ (build-time
+	# caches may be host-arch, e.g. cpython-312), pre-compile unchecked-hash .pyc
+	# so the target never recompiles on its slow FS, and rewrite the setuptools
+	# EASY-INSTALL launchers in bin/ and lib/<pkg>/ to importlib.metadata (the
+	# pkg_resources shims scan all *.dist-info at startup -- minutes on target).
 	$(call python_prepare_deploy,$(TOP_BUILDDIR)/export/deploy)
 	# Prune build/dev-only artifacts the TARGET never needs at runtime, to cut the
 	# fusefat copy's per-file cost (file count dominates the FUSE write time).

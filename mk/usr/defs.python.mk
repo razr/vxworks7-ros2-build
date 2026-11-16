@@ -30,23 +30,21 @@ PKG_PYTHON_BUILD_VAR ?= CFLAGS="-I $(WIND_CC_SYSROOT)/usr/3pp/develop/usr/includ
 # Host interpreter matching the target (same major.minor), on PATH via the SDK.
 PYTHON_HOST ?= python3.$(TGT_PYTHON_MINOR)
 
-# Console-script fixer: rewrites setuptools EASY-INSTALL shims (which import
-# pkg_resources and scan all *.dist-info at startup) into importlib.metadata
-# wrappers. Lives with the other ros2 helper scripts under pkg/ros2/files.
-PYTHON_FIX_SCRIPTS_PY ?= $(PACKAGE_DIR)/ros2/files/convert_console_scripts.py
+# Python fast-start preparer, shared with the toolkit (staged into its scripts/
+# and used by selftest-build.sh). Lives with the other ros2 helper scripts.
+PYTHON_PREPARE_PY ?= $(PACKAGE_DIR)/ros2/files/prepare_python_install.py
 
-# Prepare a deployed python tree for the TARGET, so nothing is compiled on the
-# (slow) target FS at runtime:
-#   1. compileall with unchecked-hash .pyc -> target loads bytecode, never
-#      recompiles (no source mtime/size revalidation after the image copy).
-#   2. rewrite the setuptools EASY-INSTALL console-script shims in <dir>/bin to
-#      importlib.metadata wrappers (pkg_resources scan at startup = minutes on
-#      the target FS). Each CLI (ros2 run, etc.) is unchanged. Idempotent.
-# $(1) = deploy dir (expects a bin/ subdir). Best-effort (|| true) so a single
-# odd file cannot abort the image build.
+# Prepare a deployed python tree for the TARGET so ros2 run starts fast
+# (details in prepare_python_install.py):
+#   1. strip __pycache__, then compile unchecked-hash .pyc -> target loads
+#      bytecode, never recompiles (no mtime/size revalidation after the copy).
+#   2. rewrite the setuptools EASY-INSTALL launchers in <dir>/bin and every
+#      <dir>/lib/<pkg>/ to importlib.metadata wrappers (the pkg_resources scan
+#      at startup = minutes on the target FS). Each CLI is unchanged. Idempotent.
+# $(1) = deploy dir. Best-effort (|| true) so a single odd file cannot abort
+# the image build.
 define python_prepare_deploy
-	$(PYTHON_HOST) -m compileall -q -f --invalidation-mode unchecked-hash $(1) || true
-	$(PYTHON_HOST) $(PYTHON_FIX_SCRIPTS_PY) $(1)/bin || true
+	$(PYTHON_HOST) $(PYTHON_PREPARE_PY) $(1) || true
 endef
 
 

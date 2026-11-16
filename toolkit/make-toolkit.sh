@@ -154,16 +154,18 @@ if [ -f "$RUST_TMPL" ]; then
   log "   staged rust-cargo-config.toml.template (Rust/rclrs support)"
 fi
 
-# convert_console_scripts.py: the main build rewrites setuptools EASY-INSTALL
-# console-script shims (slow pkg_resources working-set scan at startup, also
-# fragile for relocated packages) into fast importlib.metadata wrappers. Ship it
-# so a downstream Python (ament_python) build can convert its own entry scripts
-# and run via `ros2 run` the same way the baked-in packages do.
-CCS="$PACKAGE_DIR/ros2/files/convert_console_scripts.py"
-if [ -f "$CCS" ]; then
-  install -D -m0755 "$CCS" "$STAGE/scripts/convert_console_scripts.py"
-  log "   staged convert_console_scripts.py (Python entry-point fixup)"
-fi
+# prepare_python_install.py: the same Python fast-start step the image build
+# runs (python_prepare_deploy): unchecked-hash .pyc + rewrite of the setuptools
+# EASY-INSTALL launchers (slow pkg_resources scan at startup, also fragile for
+# relocated packages) into importlib.metadata wrappers. Ship it so a downstream
+# Python (ament_python) build prepares its install/ tree the same way.
+# convert_console_scripts.py is its launcher-only compatibility wrapper.
+for s in prepare_python_install.py convert_console_scripts.py; do
+  if [ -f "$PACKAGE_DIR/ros2/files/$s" ]; then
+    install -D -m0755 "$PACKAGE_DIR/ros2/files/$s" "$STAGE/scripts/$s"
+    log "   staged $s (Python fast-start)"
+  fi
+done
 
 # --- 6) manifest.json (keys == Makefile vars) + layer pin + build commit ----
 log "6) manifest.json"
