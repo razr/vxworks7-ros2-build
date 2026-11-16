@@ -316,6 +316,16 @@ case " $LANGS " in
     else
       say "5b) WARN: convert_console_scripts.py not in toolkit -- ros2 run may hit pkg_resources"
     fi
+    # Same .pyc step as the image build (python_prepare_deploy): drop whatever
+    # __pycache__ the install wrote (timestamp-checked, may be seen as stale after
+    # the copy to the USB dir) and pre-compile unchecked-hash bytecode with the SDK
+    # host python (same version as the target), so the target loads it as-is and
+    # never recompiles on its slow FS.
+    say "5c) compileall --invalidation-mode unchecked-hash $INSTALL"
+    find "$INSTALL" -type d -name __pycache__ -prune -exec rm -rf {} +
+    "$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3" -m compileall -q -f \
+      --invalidation-mode unchecked-hash "$INSTALL" \
+      || say "5c) WARN: compileall reported errors (target will compile those modules at import)"
     ;;
 esac
 
