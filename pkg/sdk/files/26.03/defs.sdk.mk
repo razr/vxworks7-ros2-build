@@ -34,57 +34,32 @@ define sdk_fix
 		echo "'defs.autotools.mk' already exists, do not copy."; \
 	fi
 
-	# SDK 26.03 defect: some 3pp libs ship with NO DT_SONAME (their libtool has
-	# no vxworks arm): libsqlite3.so* (no soname at all) and libyaml.so (soname is
-	# the UNVERSIONED "libyaml.so", which dpkg shlibs cannot express). A consumer
-	# then records an absolute-path or unversioned DT_NEEDED -> unloadable on
-	# target + unresolvable by dpkg-shlibdeps. Stamp a proper versioned soname
-	# in-place in BOTH 3pp trees (develop = build/link + sdk_deploy source; deploy
-	# = target image staging) so consumers record a versioned soname NEEDED that
-	# matches the vxworks-lib* shlibs. Idempotent; needs host patchelf.
-	# table: <glob-basename> <soname-to-set> <real-file-name-if-must-create>
-	for ENTRY in "libsqlite3.so:libsqlite3.so.0:libsqlite3.so.0.3.50.4" \
-	             "libyaml.so:libyaml.so.0:libyaml.so.0.2.5"; do \
-		base=$${ENTRY%%:*}; rest=$${ENTRY#*:}; soname=$${rest%%:*}; realname=$${rest#*:}; \
-		for D in $(3PP_DEVELOP_DIR)/usr/lib $(3PP_DEPLOY_DIR)/usr/lib; do \
-			[ -f $$D/$$base ] || continue; \
-			cur=$$(wr-readelf -d $$D/$$base 2>/dev/null | sed -n 's/.*SONAME.*\[\(.*\)\].*/\1/p'); \
-			if [ "$$cur" = "$$soname" ]; then \
-				echo "$$D/$$base already SONAME=$$soname, skip."; continue; \
-			fi; \
-			if ! command -v patchelf >/dev/null 2>&1; then \
-				echo "WARNING: $$D/$$base needs a soname but patchelf is not installed"; continue; \
-			fi; \
-			real=$$(ls $$D/$$base.[0-9]* 2>/dev/null | grep -E '\.so\.[0-9].*[0-9]$$' | head -1); \
-			[ -n "$$real" ] || real=$$D/$$realname; \
-			[ -e "$$real" ] || cp $$D/$$base "$$real"; \
-			patchelf --set-soname $$soname "$$real"; \
-			[ "$$(basename $$real)" = "$$soname" ] || ln -sf "$$(basename $$real)" $$D/$$soname; \
-			ln -sf $$soname $$D/$$base; \
-			echo "stamped DT_SONAME=$$soname on $$D/$$(basename $$real)"; \
-		done; \
+	# SDK 26.03 defect: libsqlite3.so* ship with NO DT_SONAME (sqlite's libtool has
+	# no vxworks arm), so a consumer records an absolute-path DT_NEEDED: unloadable
+	# on target and unresolvable by dpkg-shlibdeps. patchelf --set-soname must NOT
+	# be used: it appends a 3rd PT_LOAD and the VxWorks ldso accepts exactly 2
+	# ("wrong number of segments (3 != 2)", ldso_7x/libdl/map_object.c). Instead
+	# relink the shared lib from the shipped libsqlite3.a with the soname set by the
+	# linker (2 segments, like every properly built SDK lib), in BOTH 3pp trees.
+	# libyaml.so (unversioned soname "libyaml.so") ships no .a, so it is left as is;
+	# it loads fine on target. Idempotent: skipped once the soname is set and the
+	# lib has 2 LOAD segments (also repairs a lib an older build patchelf-stamped).
+	for D in $(3PP_DEVELOP_DIR)/usr/lib $(3PP_DEPLOY_DIR)/usr/lib; do \
+		[ -f $$D/libsqlite3.a ] || continue; \
+		cur=$$(wr-readelf -d $$D/libsqlite3.so 2>/dev/null | sed -n 's/.*SONAME.*\[\(.*\)\].*/\1/p'); \
+		segs=$$(wr-readelf -lW $$D/libsqlite3.so 2>/dev/null | grep -c '^ *LOAD '); \
+		if [ "$$cur" = "libsqlite3.so.0" ] && [ "$$segs" = 2 ]; then \
+			echo "$$D/libsqlite3.so already SONAME=libsqlite3.so.0 (2 LOAD), skip."; continue; \
+		fi; \
+		real=$$(ls $$D/libsqlite3.so.[0-9]*.[0-9]* 2>/dev/null | head -1); \
+		[ -n "$$real" ] || real=$$D/libsqlite3.so.0.3.50.4; \
+		rm -f $$D/libsqlite3.so $$D/libsqlite3.so.0 "$$real"; \
+		wr-cc -shared -o "$$real" -Wl,-soname,libsqlite3.so.0 \
+			-Wl,--whole-archive $$D/libsqlite3.a -Wl,--no-whole-archive || exit 1; \
+		ln -sf "$$(basename $$real)" $$D/libsqlite3.so.0; \
+		ln -sf libsqlite3.so.0 $$D/libsqlite3.so; \
+		echo "relinked $$real with SONAME=libsqlite3.so.0"; \
 	done
-
-	# Prebuilt SDK 3pp consumers were linked against the soname-less/unversioned
-	# lib and keep that NEEDED (e.g. libcyaml.so.1 NEEDS "libyaml.so"), which the
-	# soname stamp above cannot change. Rewrite such NEEDED entries to the
-	# versioned soname in BOTH 3pp trees so dpkg-shlibdeps can resolve them.
-	# Idempotent (a rewritten entry no longer matches); needs host patchelf.
-	if command -v patchelf >/dev/null 2>&1; then \
-		for ENTRY in "libsqlite3.so:libsqlite3.so.0" "libyaml.so:libyaml.so.0"; do \
-			old=$${ENTRY%%:*}; new=$${ENTRY#*:}; \
-			for D in $(3PP_DEVELOP_DIR)/usr/lib $(3PP_DEPLOY_DIR)/usr/lib; do \
-				for f in $$D/*.so*; do \
-					[ -f "$$f" ] && [ ! -L "$$f" ] || continue; \
-					patchelf --print-needed "$$f" 2>/dev/null | grep -qx "$$old" || continue; \
-					patchelf --replace-needed "$$old" "$$new" "$$f"; \
-					echo "rewrote NEEDED $$old -> $$new in $$f"; \
-				done; \
-			done; \
-		done; \
-	else \
-		echo "WARNING: patchelf not installed; prebuilt 3pp NEEDED entries left unversioned"; \
-	fi
 endef
 
 define vxworks_fix
