@@ -30,6 +30,15 @@ inputs:
 runs:
   using: 'composite'
   steps:
+    # sdkenv.sh refuses to run with /bin/sh = dash (Ubuntu's default): use bash,
+    # as the build containers do (Docker/*/vxbuild: dpkg-reconfigure dash)
+    - name: Use bash as /bin/sh (required by sdkenv.sh)
+      run: |
+        echo "dash dash/sh boolean false" | sudo debconf-set-selections
+        sudo DEBIAN_FRONTEND=noninteractive dpkg-reconfigure dash
+        ls -l /bin/sh
+      shell: bash
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
