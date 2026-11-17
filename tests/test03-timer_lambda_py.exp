@@ -9,7 +9,7 @@ proc test03-timer_lambda_py {} {
         expect {
             -exact {Hello, world!} { }
             timeout {
-                puts "FAIL test03: timed out waiting for 'Hello, world!' (#[expr {$i + 1}])"
+                puts "\nFAIL test03: timed out waiting for 'Hello, world!' (#[expr {$i + 1}])"
                 send_ctrl_c
                 return
             }

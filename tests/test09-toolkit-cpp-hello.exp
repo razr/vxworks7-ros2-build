@@ -18,13 +18,13 @@ proc test09-toolkit-cpp-hello {} {
     vxworks::send_cmd $qemu::spawn_id "/bd0a/lib/hello_cpp/hello_cpp"
     expect {
         -exact {Hello from C++, world!} {
-            puts "PASS test09: toolkit-built C++ RTP printed the marker"
+            puts "\nPASS test09: toolkit-built C++ RTP printed the marker"
         }
         -re {Can't open file|No such file or directory|INSTANTIATE_FAILED} {
-            puts "test09 SKIP: /bd0a/lib/hello_cpp/hello_cpp not present (run selftest-build.sh --lang cpp + boot with VX_USB)"
+            puts "\ntest09 SKIP: /bd0a/lib/hello_cpp/hello_cpp not present (run selftest-build.sh --lang cpp + boot with VX_USB)"
         }
         timeout {
-            puts "FAIL test09: timed out waiting for the marker from hello_cpp"
+            puts "\nFAIL test09: timed out waiting for the marker from hello_cpp"
         }
     }
 }

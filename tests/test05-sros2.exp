@@ -24,7 +24,7 @@ proc test05-sros2_talker_py {} {
             puts "demo_keystore not found, skipping SROS2 test."
         }
         timeout {
-            puts "FAIL test05: timed out checking for the demo keystore"
+            puts "\nFAIL test05: timed out checking for the demo keystore"
         }
     }
 }

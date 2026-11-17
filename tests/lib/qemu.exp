@@ -116,8 +116,9 @@ namespace eval qemu {
         if {[target] eq "rpi4"} {
             # aarch64 raspi4b: stock SDK dtb + bootline via -append (-> /chosen/bootargs
             # -> vxFdtBootargsGet, same as x86). SD via -sd; GENET on tap0; console on
-            # serial1 (-serial null -serial mon:stdio). Fully emulated (TCG, no KVM on
-            # x86 host) -> slow; see timeout note.
+            # serial1 (-serial null -serial mon:stdio). Runs under TCG on any host (no
+            # KVM for raspi4b yet; CI boots it on an arm64 runner, x86 hosts work too)
+            # -> slow; see timeout note.
             set dtb [find_dtb $kernel]
             set bootline [rpi_bootline]
             puts "Booting raspi4b (aarch64, TCG) qemu=$qemu kernel=$kernel dtb=$dtb"
