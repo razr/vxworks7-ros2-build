@@ -40,7 +40,6 @@ All paths in this document are relative to that toolkit root.
 | `scripts/ros2sdk-prepare.sh` | one-time: relocate the ROS 2 SDK to this location + sanity-check |
 | `scripts/selftest-build.sh` | build + deploy a C++/Rust/Python hello-world to verify the toolkit (`--lang`) |
 | `scripts/run-qemu.sh` | boot `ros2.img`; `--usb <dir>` attaches your binary as `/bd0a` |
-| `scripts/prepare_python_install.py` | prepare a Python `install/` tree for a fast start on the target (`.pyc` + launcher rewrite) |
 | `scripts/extract-deploy.sh` / `make-image.sh` | extract / rebuild `ros2.img` |
 | `scripts/generate-manifest.py` | (re)generate `manifest.json` |
 | `manifest.json` | what was built: distro, VxWorks release, arch, layer pin, package/patch/ignore lists |
@@ -115,7 +114,7 @@ Python packages need one extra step after `colcon build`, before you stage
 runtime in `ros2.img`:
 
 ```bash
-python3 scripts/prepare_python_install.py install
+optimize-python-startup install
 ```
 
 It compiles unchecked-hash `.pyc` (the target loads them as-is and never
@@ -123,8 +122,9 @@ recompiles on its slow FAT file system) and rewrites the setuptools launchers in
 `install/bin` and `install/lib/<pkg>/` to `importlib.metadata`. The original
 launchers import `pkg_resources`, which scans every installed package's metadata
 at startup (minutes on QEMU) and fails with `DistributionNotFound` for a package
-run from `/bd0a`. Run it with the SDK's `python3` (on `PATH` after sourcing
-`ros2sdkenv.sh`); it must match the target's Python version.
+run from `/bd0a`. `optimize-python-startup` is an SDK host tool (on `PATH` after
+sourcing `ros2sdkenv.sh`) and runs with the SDK's `python3`, which matches the
+target's Python version.
 
 Rust needs the toolkit's Rust support (shipped only if built with `ROS2_RUST`):
 the ROS 2 crate sources in `export/root/share/*/rust` + the cargo config

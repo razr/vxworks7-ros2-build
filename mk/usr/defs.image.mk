@@ -28,7 +28,7 @@ define build_fs
 	mkdir -p $(TOP_BUILDDIR)/mount
 	fusefat -o rw+ $(1) $(TOP_BUILDDIR)/mount
 	# Prepare the deployed python for the target (mk/usr/defs.python.mk ->
-	# pkg/ros2/files/prepare_python_install.py): strip __pycache__ (build-time
+	# optimize-python-startup (pkg/sdk)): strip __pycache__ (build-time
 	# caches may be host-arch, e.g. cpython-312), pre-compile unchecked-hash .pyc
 	# so the target never recompiles on its slow FS, and rewrite the setuptools
 	# EASY-INSTALL launchers in bin/ and lib/<pkg>/ to importlib.metadata (the

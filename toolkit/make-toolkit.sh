@@ -76,9 +76,11 @@ grep -q 'lunixextra' "$WIND_CC_SYSROOT/cc-conf/default.conf" \
   || die "patched SDK default.conf has no -lunixextra (is the SDK patched? run 'make sdk')"
 install -D -m0644 "$WIND_CC_SYSROOT/cc-conf/default.conf" "$OV/$SYSROOT_REL/cc-conf/default.conf"
 
-# 1e) host bin: pip/python launchers + symlinks + cargo-ament-build  <- patched SDK
+# 1e) host bin: pip/python launchers + symlinks + cargo-ament-build +
+#     optimize-python-startup  <- patched SDK
 install -D -m0755 "$SDK_HOSTBIN/pip3.9"           "$OV/$HOSTBIN_REL/pip3.9"
 install -D -m0755 "$SDK_HOSTBIN/cargo-ament-build" "$OV/$HOSTBIN_REL/cargo-ament-build"
+install -D -m0755 "$SDK_HOSTBIN/optimize-python-startup" "$OV/$HOSTBIN_REL/optimize-python-startup"
 ln -sf pip3.9    "$OV/$HOSTBIN_REL/pip"
 ln -sf pip3.9    "$OV/$HOSTBIN_REL/pip3"
 ln -sf python3.9 "$OV/$HOSTBIN_REL/python"
@@ -152,17 +154,6 @@ RUST_TMPL="$PACKAGE_DIR/ros2/files/$ROS_DISTRO/rust-cargo-config.toml.template"
 if [ -f "$RUST_TMPL" ]; then
   install -D -m0644 "$RUST_TMPL" "$STAGE/scripts/rust-cargo-config.toml.template"
   log "   staged rust-cargo-config.toml.template (Rust/rclrs support)"
-fi
-
-# prepare_python_install.py: the same Python fast-start step the image build
-# runs (python_prepare_deploy): unchecked-hash .pyc + rewrite of the setuptools
-# EASY-INSTALL launchers (slow pkg_resources scan at startup, also fragile for
-# relocated packages) into importlib.metadata wrappers. Ship it so a downstream
-# Python (ament_python) build prepares its install/ tree the same way.
-PPI="$PACKAGE_DIR/ros2/files/prepare_python_install.py"
-if [ -f "$PPI" ]; then
-  install -D -m0755 "$PPI" "$STAGE/scripts/prepare_python_install.py"
-  log "   staged prepare_python_install.py (Python fast-start)"
 fi
 
 # --- 6) manifest.json (keys == Makefile vars) + layer pin + build commit ----

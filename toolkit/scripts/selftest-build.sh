@@ -308,11 +308,11 @@ done
 # relocated to /bd0a (DistributionNotFound) -- into an importlib.metadata wrapper.
 case " $LANGS " in
   *" python "*)
-    PPI="$TOOLKIT_ROOT/scripts/prepare_python_install.py"
-    [ -f "$PPI" ] || die "[python] prepare_python_install.py not in toolkit"
-    say "5b) prepare_python_install.py $INSTALL"
-    "$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3" "$PPI" "$INSTALL" \
-      || die "[python] prepare_python_install failed"
+    OPS="$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/optimize-python-startup"
+    [ -x "$OPS" ] || die "[python] optimize-python-startup not in the SDK host bin (toolkit SDK overlay not applied?)"
+    say "5b) optimize-python-startup $INSTALL"
+    "$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3" "$OPS" "$INSTALL" \
+      || die "[python] optimize-python-startup failed"
     ;;
 esac
 

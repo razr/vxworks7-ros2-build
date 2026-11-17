@@ -57,6 +57,10 @@ sdk.build : sdk.configure
 sdk.install : sdk.build
 	@$(call echo_action,Installing extra SDK packages,$*)
 	$(call sdk_install,$*)
+	# Generic Python fast-start host tool (release-independent), on PATH after
+	# sdkenv.sh: optimize-python-startup <root> -> unchecked-hash .pyc +
+	# importlib.metadata launchers. Used by python_prepare_deploy + the toolkit.
+	install -D -m0755 files/optimize-python-startup.py $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/optimize-python-startup
 	@$(MAKE_STAMP)
 
 sdk.deploy : sdk.install

@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-# prepare_python_install.py - prepare a ROS 2 install/deploy tree so Python
-# starts fast on the VxWorks target. Used by the image build
-# (python_prepare_deploy in mk/usr/defs.python.mk), by the toolkit self-test,
-# and by toolkit users on their own colcon install/ tree.
+# optimize-python-startup - make a Python install/deploy tree start fast on the
+# VxWorks target: precompile unchecked-hash .pyc and replace the setuptools
+# EASY-INSTALL launchers with importlib.metadata ones. A generic host tool,
+# installed by pkg/sdk into the SDK host bin (on PATH after sdkenv.sh). Used by
+# the image build (python_prepare_deploy in mk/usr/defs.python.mk), the toolkit
+# self-test, and users on their own colcon install/ tree.
 #
 # Why: on the target every file stat/open goes to a FAT image (over emulated
 # AHCI under QEMU TCG), so Python startup cost grows with the number of files
@@ -23,7 +25,7 @@
 #      importlib.metadata wrappers that resolve the same single entry point.
 #
 # Idempotent. Best-effort: compile errors are reported but do not fail.
-# Usage: prepare_python_install.py [--no-compile] <root>
+# Usage: optimize-python-startup [--no-compile] <root>
 
 import compileall
 import os
@@ -117,25 +119,25 @@ def main(argv):
     args = [a for a in argv if a != '--no-compile']
     compile_py = len(args) == len(argv)
     if len(args) != 1 or not os.path.isdir(args[0]):
-        print('usage: prepare_python_install.py [--no-compile] <root>',
+        print('usage: optimize-python-startup [--no-compile] <root>',
               file=sys.stderr)
         return 2
     root = args[0]
 
     if compile_py:
         n = strip_pycache(root)
-        print('prepare_python_install: removed %d __pycache__ dir(s) in %s'
+        print('optimize-python-startup: removed %d __pycache__ dir(s) in %s'
               % (n, root))
         ok = compileall.compile_dir(
             root, quiet=1, force=True,
             invalidation_mode=py_compile.PycInvalidationMode.UNCHECKED_HASH)
-        print('prepare_python_install: compiled unchecked-hash .pyc in %s%s'
+        print('optimize-python-startup: compiled unchecked-hash .pyc in %s%s'
               % (root, '' if ok else ' (some files failed; see above)'))
 
     total = 0
     for d in launcher_dirs(root):
         total += convert_dir(d)
-    print('prepare_python_install: converted %d launcher(s) in %s'
+    print('optimize-python-startup: converted %d launcher(s) in %s'
           % (total, root))
     return 0
 
