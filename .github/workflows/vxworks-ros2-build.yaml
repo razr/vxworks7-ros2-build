@@ -136,8 +136,8 @@ jobs:
           context: Docker/${{ steps.version.outputs.ubuntu }}/vxbuild/.
           push: true
           tags: localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=vxbuild-${{ steps.version.outputs.ubuntu }}
+          cache-to: type=gha,mode=max,scope=vxbuild-${{ steps.version.outputs.ubuntu }}
         env:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
@@ -156,8 +156,8 @@ jobs:
             ROS_DISTRO=${{ env.ros_distro }}
             BASE_IMAGE=localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
           tags: vxros2build:${{ env.ros_distro }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-from: type=gha,scope=vxros2build-${{ env.ros_distro }}
+          cache-to: type=gha,mode=max,scope=vxros2build-${{ env.ros_distro }}
         env:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
