@@ -64,6 +64,27 @@ define sdk_fix
 			echo "stamped DT_SONAME=$$soname on $$D/$$(basename $$real)"; \
 		done; \
 	done
+
+	# Prebuilt SDK 3pp consumers were linked against the soname-less/unversioned
+	# lib and keep that NEEDED (e.g. libcyaml.so.1 NEEDS "libyaml.so"), which the
+	# soname stamp above cannot change. Rewrite such NEEDED entries to the
+	# versioned soname in BOTH 3pp trees so dpkg-shlibdeps can resolve them.
+	# Idempotent (a rewritten entry no longer matches); needs host patchelf.
+	if command -v patchelf >/dev/null 2>&1; then \
+		for ENTRY in "libsqlite3.so:libsqlite3.so.0" "libyaml.so:libyaml.so.0"; do \
+			old=$${ENTRY%%:*}; new=$${ENTRY#*:}; \
+			for D in $(3PP_DEVELOP_DIR)/usr/lib $(3PP_DEPLOY_DIR)/usr/lib; do \
+				for f in $$D/*.so*; do \
+					[ -f "$$f" ] && [ ! -L "$$f" ] || continue; \
+					patchelf --print-needed "$$f" 2>/dev/null | grep -qx "$$old" || continue; \
+					patchelf --replace-needed "$$old" "$$new" "$$f"; \
+					echo "rewrote NEEDED $$old -> $$new in $$f"; \
+				done; \
+			done; \
+		done; \
+	else \
+		echo "WARNING: patchelf not installed; prebuilt 3pp NEEDED entries left unversioned"; \
+	fi
 endef
 
 define vxworks_fix
