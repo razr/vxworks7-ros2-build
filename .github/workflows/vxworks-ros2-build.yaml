@@ -247,13 +247,12 @@ jobs:
             ${{ github.workspace }}/*xWorks*
             ${{ github.workspace }}/*.dtb
 
-      - name: Pack the ROS 2 SDK (export/root) and the SDK overlay
+      - name: Pack the ROS 2 SDK (export/root)
         run: |
           # tar, because upload-artifact does not keep symlinks (.so chains).
           cd ${{ github.workspace }}/output
           tar --zstd -cf ros2-sdk.tar.zst export/root
-          tar -cf sdk-overlay.tar sdk_overlay sdk_overlay.json
-          ls -l ros2-sdk.tar.zst sdk-overlay.tar
+          ls -l ros2-sdk.tar.zst
 
       - name: Upload the ROS 2 SDK (export/root)
         uses: actions/upload-artifact@v4
@@ -265,7 +264,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: SDK overlay ${{ env.sdk }} ${{ env.ros_distro }}
-          path: ${{ github.workspace }}/output/sdk-overlay.tar
+          # make sdk-overlay's archive (files/ + sdk_overlay.json + install-sdk-overlay.sh)
+          path: ${{ github.workspace }}/output/sdk-overlay-*.tar.*
 
       - name: Setup upterm session
         if: ${{ always() && inputs.debug }}
@@ -323,22 +323,22 @@ jobs:
         run: |
           cd ${{ github.workspace }}/output
           tar --zstd -xf ros2-sdk.tar.zst && rm ros2-sdk.tar.zst
-          tar -xf sdk-overlay.tar && rm sdk-overlay.tar
-          ls -ld export/root sdk_overlay sdk_overlay.json ros2.img
+          mkdir -p sdk-overlay-build
+          tar --zstd -C sdk-overlay-build -xf sdk-overlay-*.tar.zst
+          ls -ld export/root sdk-overlay-build/sdk-overlay-* ros2.img
           cd ${{ github.workspace }} && make toolkit
 
       - name: Upload the ROS 2 SDK toolkit
         uses: actions/upload-artifact@v4
         with:
           name: ros2-vxworks-toolkit ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
-          path: ${{ github.workspace }}/output/ros2-vxworks-*.tar.*
+          path: ${{ github.workspace }}/output/toolkit-*.tar.*
 
   test:
-    runs-on: ubuntu-24.04
-    needs: [build, toolkit]
-    # Run when the build succeeded and the toolkit job succeeded or was skipped
-    # (toolkit off): a plain needs: would skip the tests with the toolkit.
-    if: ${{ always() && inputs.test && needs.build.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.toolkit.result) }}
+    # raspberrypi4b: boot the aarch64 target on an arm64 host; x86 SDKs on amd64
+    runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    needs: build
+    if: ${{ inputs.test }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -355,36 +355,8 @@ jobs:
         with:
           name: HDD image ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
 
-      - name: Install QEMU and expect
-        run: |
-          sudo apt-get update
-          # x86_64 (distro) + aarch64. For aarch64 we use the PATCHED qemu from
-          # razr/qemu-raspi4-deb (BCM2838 GENET + SD->emmc2 routing that VxWorks
-          # raspi4b needs; distro qemu-system-aarch64 lacks these). The .deb
-          # installs /usr/bin/qemu-system-aarch64-raspi4; symlink it to the normal
-          # qemu-system-aarch64 name so the harness (qemu_bin) finds it.
-          sudo apt-get install -y expect uml-utilities qemu-system-x86
-
-          deb_url=$(curl -fsSL https://api.github.com/repos/razr/qemu-raspi4-deb/releases/latest \
-            | grep -oE 'https://[^"]*/qemu-raspi4_[^"]*_amd64\.deb' | head -1)
-          echo "qemu-raspi4 deb: $deb_url"
-          curl -fL -o /tmp/qemu-raspi4.deb "$deb_url"
-          sudo apt-get install -y /tmp/qemu-raspi4.deb
-          sudo ln -sf /usr/bin/qemu-system-aarch64-raspi4 /usr/local/bin/qemu-system-aarch64
-          qemu-system-aarch64 --version | head -1
-
-          # KVM for the x86 target: /dev/kvm is crw-rw---- root:kvm and
-          # `usermod -aG kvm` does not apply to the running job shell, so
-          # -enable-kvm fails with "Permission denied". Make the device accessible
-          # now (qemu.exp falls back to TCG if it still is not writable; aarch64
-          # always runs TCG).
-          sudo usermod -aG kvm "$USER" || true
-          if [ -e /dev/kvm ]; then sudo chmod 0666 /dev/kvm || true; fi
-          ls -l /dev/kvm || echo "no /dev/kvm on this runner (x86 tests run under TCG)"
-
-          # tap0 for the target NIC (both targets use 192.168.200.254 on the host)
-          sudo tunctl -u $USER -t tap0
-          sudo ifconfig tap0 192.168.200.254 up
+      - name: Set up the QEMU test host
+        uses: ./.github/actions/setup-qemu
 
       - name: Run Tests with QEMU and expect
         env:
@@ -403,15 +375,26 @@ jobs:
           echo "Running tests..."
           ./tests/main_script.exp output/ros2.img
 
+  # The toolkit self-test, split by host: the samples are built with the SDK's
+  # host tools (vxsdk/host/x86_64-linux), so on x86; they are run on QEMU on the
+  # runner that matches the target (aarch64 raspi4b on arm64, like the test job).
+  toolkit-selftest:
+    runs-on: ubuntu-24.04
+    needs: [build, toolkit]
+    if: ${{ inputs.test && inputs.toolkit }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
       - name: Download the ROS 2 SDK toolkit
-        if: ${{ inputs.toolkit }}
         uses: actions/download-artifact@v4
         with:
           name: ros2-vxworks-toolkit ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
           path: ${{ github.workspace }}/toolkit-dl
 
       - name: Get a vanilla VxWorks SDK for the toolkit self-test
-        if: ${{ inputs.toolkit }}
         uses: ./.github/actions/setup-wrsdk
         with:
           sdks_list: wrsdks.json
@@ -424,7 +407,6 @@ jobs:
           sdkenv: false
 
       - name: Toolkit self-test — build the C++/Rust/Python samples from the toolkit
-        if: ${{ inputs.toolkit }}
         run: |
           # The toolkit user's path: a vanilla SDK + the toolkit tarball, on the
           # host (no build container). selftest-build.sh unpacks the toolkit,
@@ -432,22 +414,62 @@ jobs:
           # language and stages install/ on a USB dir (-> /bd0a on target).
           sudo apt-get install -y zstd
           cd ${{ github.workspace }}
-          TK="$(ls toolkit-dl/ros2-vxworks-*.tar.* | head -1)"
+          TK="$(ls toolkit-dl/toolkit-*.tar.* | head -1)"
           [ -f "$TK" ] || { echo "no toolkit tarball in toolkit-dl/"; exit 1; }
           set +u; . /tmp/vanilla/wrsdk/sdkenv.sh; set -u
           ./toolkit/scripts/selftest-build.sh --toolkit "$TK" --sdk /tmp/vanilla/wrsdk \
             --workdir ${{ github.workspace }}/selftest
           echo "--- selftest.env ---"; cat selftest/selftest.env
 
+      - name: Pack the USB stage and the toolkit image
+        run: |
+          # tar, because upload-artifact does not keep symlinks (.so chains)
+          cd ${{ github.workspace }}/selftest
+          . ./selftest.env
+          printf 'VX_TESTS="%s"\n' "$VX_TESTS" > tests.env
+          cp "$VX_IMG" ros2.img
+          tar --zstd -cf ../toolkit-selftest.tar.zst usb ros2.img tests.env
+          ls -l ../toolkit-selftest.tar.zst
+
+      - name: Upload the USB stage and the toolkit image
+        uses: actions/upload-artifact@v4
+        with:
+          name: toolkit-selftest ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+          path: ${{ github.workspace }}/toolkit-selftest.tar.zst
+
+  toolkit-test:
+    # same host choice as the test job
+    runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    needs: [build, toolkit-selftest]
+    if: ${{ inputs.test && inputs.toolkit }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # the VxWorks kernel the tests boot ships with the HDD image artifact
+      - name: Download HDD image and VxWorks artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: HDD image ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+
+      - name: Download the USB stage and the toolkit image
+        uses: actions/download-artifact@v4
+        with:
+          name: toolkit-selftest ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+          path: ${{ github.workspace }}
+
+      - name: Set up the QEMU test host
+        uses: ./.github/actions/setup-qemu
+
       - name: Toolkit self-test — run on QEMU (USB -> /bd0a; image untouched)
-        if: ${{ inputs.toolkit }}
         env:
           SDK: ${{ needs.build.outputs.sdk }}
         run: |
           cd ${{ github.workspace }}
           [ "$SDK" = "raspberrypi4b" ] && export VX_TARGET=rpi4
-          # selftest.env: VX_USB (USB stage), VX_IMG (the toolkit's ros2.img) and
-          # VX_TESTS (test*-toolkit-<lang>-*), all absolute paths in this job.
-          . selftest/selftest.env
-          echo "VX_USB=$VX_USB  VX_IMG=$VX_IMG  TESTS=$VX_TESTS"
-          VX_USB="$VX_USB" ./tests/main_script.exp "$VX_IMG" $VX_TESTS
+          mkdir -p selftest && tar --zstd -C selftest -xf toolkit-selftest.tar.zst
+          . selftest/tests.env      # VX_TESTS: test*-toolkit-<lang>-*
+          echo "VX_USB=$PWD/selftest/usb  image=$PWD/selftest/ros2.img  TESTS=$VX_TESTS"
+          VX_USB="$PWD/selftest/usb" ./tests/main_script.exp "$PWD/selftest/ros2.img" $VX_TESTS
