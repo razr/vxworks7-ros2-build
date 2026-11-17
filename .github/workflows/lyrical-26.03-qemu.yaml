@@ -14,6 +14,10 @@ on:
         description: "build toolkit"
         type: boolean
         default: true
+      layer_url:
+        description: "vxworks7-layer-for-ros2 URL"
+        type: string
+        default: "https://github.com/razr/vxworks7-layer-for-ros2.git"
       debug:
         description: "enable debug mode"
         type: boolean
@@ -32,4 +36,7 @@ jobs:
       test: ${{ github.event_name != 'workflow_dispatch' || inputs.test == true }}
       toolkit: ${{ github.event_name != 'workflow_dispatch' || inputs.toolkit == true }}
       debug: ${{ github.event_name == 'workflow_dispatch' && inputs.debug == true }}
+      # TEMPORARY: the razr layer fork carries the sqlite_vendor/libyaml_vendor/
+      # pyyaml_vendor patches until they are merged into Wind-River; then drop this.
+      layer_url: ${{ inputs.layer_url || 'https://github.com/razr/vxworks7-layer-for-ros2.git' }}
  

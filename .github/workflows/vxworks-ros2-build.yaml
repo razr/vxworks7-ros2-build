@@ -27,6 +27,9 @@ on:
         required: false
         type: boolean
         default: false
+      layer_url:
+        type: string
+        default: ""
       debug:
         required: false
         type: boolean
@@ -56,6 +59,10 @@ on:
         required: false
         default: false
         type: boolean
+      layer_url:
+        description: "vxworks7-layer-for-ros2 URL (empty = Makefile default)"
+        type: string
+        default: ""
       debug:
         description: "Debug"
         required: false
@@ -190,7 +197,7 @@ jobs:
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs -C /work'
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs -C /work ${{ inputs.layer_url && format('PKG_LAYER_URL={0} TOOLKIT_LAYER_URL={0}', inputs.layer_url) || '' }}'
 
       - name: Create an SROS2 script
         run: |
@@ -255,37 +262,7 @@ jobs:
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make toolkit -C /work'
-
-      - name: Toolkit self-test — build + stage (host half, in Docker)
-        if: ${{ inputs.toolkit && inputs.test }}
-        run: |
-          # Build C++/Rust/Python hello nodes FROM the just-assembled toolkit and
-          # stage them on a USB dir (-> /bd0a on target). Runs in the SDK Docker so
-          # wr-cc/colcon/cargo are available. Deterministic --workdir under the
-          # workspace so the QEMU job can pick up the usb/ tree + toolkit image.
-          # The 'set -- /wrsdk/sdkenv.sh;' prefix is required: the vxbuild entrypoint
-          # runs 'su -c "$*"', which drops the quotes around the bash -c script and
-          # would otherwise run '/bin/bash -c .' ('.: filename argument required').
-          docker run --rm \
-            -e UID=$(id -u) -e GID=$(id -g) \
-            -v /tmp/wrsdk:/wrsdk \
-            -v ${{ github.workspace }}:/work \
-            vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && /work/toolkit/scripts/selftest-build.sh --workdir /work/selftest'
-          echo "--- selftest.env ---"; cat ${{ github.workspace }}/selftest/selftest.env
-
-      - name: Toolkit self-test — upload USB stage + toolkit image
-        if: ${{ inputs.toolkit && inputs.test }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: toolkit-selftest ${{ env.sdk }} ${{ env.ros_distro }}
-          # usb/ (the /bd0a payload), the toolkit's own ros2.img, and the
-          # selftest.env handoff (VX_USB / VX_IMG / VX_TESTS).
-          path: |
-            ${{ github.workspace }}/selftest/usb/**
-            ${{ github.workspace }}/selftest/selftest.env
-            ${{ github.workspace }}/selftest/toolkit/ros2-vxworks-*/ros2.img
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make toolkit -C /work ${{ inputs.layer_url && format('PKG_LAYER_URL={0} TOOLKIT_LAYER_URL={0}', inputs.layer_url) || '' }}'
 
       - name: Upload the ROS 2 SDK toolkit
         if: ${{ inputs.toolkit }}
@@ -374,27 +351,51 @@ jobs:
           echo "Running tests..."
           ./tests/main_script.exp output/ros2.img
 
-      - name: Download toolkit self-test USB stage + image
-        if: ${{ inputs.toolkit && inputs.test }}
+      - name: Download the ROS 2 SDK toolkit
+        if: ${{ inputs.toolkit }}
         uses: actions/download-artifact@v4
         with:
-          name: toolkit-selftest ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
-          path: ${{ github.workspace }}/selftest
+          name: ros2-vxworks-toolkit ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+          path: ${{ github.workspace }}/toolkit-dl
+
+      - name: Get a vanilla VxWorks SDK for the toolkit self-test
+        if: ${{ inputs.toolkit }}
+        uses: ./.github/actions/setup-wrsdk
+        with:
+          sdks_list: wrsdks.json
+          sdk: ${{ needs.build.outputs.sdk }}
+          vxworks: ${{ inputs.vxworks }}
+          # Own directory: the action's "extracted SDK" cache is keyed by tarball
+          # name only, and the build job saves /tmp/wrsdk AFTER pkg/sdk patched it.
+          # A separate path gets a separate cache entry, i.e. a fresh extraction.
+          directory: /tmp/vanilla
+          sdkenv: false
+
+      - name: Toolkit self-test — build the C++/Rust/Python samples from the toolkit
+        if: ${{ inputs.toolkit }}
+        run: |
+          # The toolkit user's path: a vanilla SDK + the toolkit tarball, on the
+          # host (no build container). selftest-build.sh unpacks the toolkit,
+          # applies it to the SDK (ros2sdk-prepare.sh), builds one node per
+          # language and stages install/ on a USB dir (-> /bd0a on target).
+          sudo apt-get install -y zstd
+          cd ${{ github.workspace }}
+          TK="$(ls toolkit-dl/ros2-vxworks-*.tar.* | head -1)"
+          [ -f "$TK" ] || { echo "no toolkit tarball in toolkit-dl/"; exit 1; }
+          set +u; . /tmp/vanilla/wrsdk/sdkenv.sh; set -u
+          ./toolkit/scripts/selftest-build.sh --toolkit "$TK" --sdk /tmp/vanilla/wrsdk \
+            --workdir ${{ github.workspace }}/selftest
+          echo "--- selftest.env ---"; cat selftest/selftest.env
 
       - name: Toolkit self-test — run on QEMU (USB -> /bd0a; image untouched)
-        if: ${{ inputs.toolkit && inputs.test }}
+        if: ${{ inputs.toolkit }}
         env:
           SDK: ${{ needs.build.outputs.sdk }}
         run: |
           cd ${{ github.workspace }}
           [ "$SDK" = "raspberrypi4b" ] && export VX_TARGET=rpi4
-          # Paths were produced by selftest-build.sh and preserved by the artifact.
-          # selftest.env carries VX_TESTS (test09/10/11) and the toolkit image path.
+          # selftest.env: VX_USB (USB stage), VX_IMG (the toolkit's ros2.img) and
+          # VX_TESTS (test*-toolkit-<lang>-*), all absolute paths in this job.
           . selftest/selftest.env
-          # The artifact flattens absolute paths back under ./selftest; re-point.
-          VX_USB="${{ github.workspace }}/selftest/usb"
-          IMG="$(ls ${{ github.workspace }}/selftest/toolkit/ros2-vxworks-*/ros2.img 2>/dev/null | head -1)"
-          [ -d "$VX_USB" ] || { echo "no USB stage at $VX_USB"; exit 1; }
-          [ -f "$IMG" ]    || { echo "no toolkit image under selftest/toolkit/"; exit 1; }
-          echo "VX_USB=$VX_USB  IMG=$IMG  TESTS=$VX_TESTS"
-          VX_USB="$VX_USB" ./tests/main_script.exp "$IMG" $VX_TESTS
+          echo "VX_USB=$VX_USB  VX_IMG=$VX_IMG  TESTS=$VX_TESTS"
+          VX_USB="$VX_USB" ./tests/main_script.exp "$VX_IMG" $VX_TESTS
