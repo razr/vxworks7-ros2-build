@@ -34,31 +34,26 @@ define sdk_fix
 		echo "'defs.autotools.mk' already exists, do not copy."; \
 	fi
 
-	# SDK 26.03 defect: libsqlite3.so* ship with NO DT_SONAME (sqlite's libtool has
-	# no vxworks arm), so a consumer records an absolute-path DT_NEEDED: unloadable
-	# on target and unresolvable by dpkg-shlibdeps. patchelf --set-soname must NOT
-	# be used: it appends a 3rd PT_LOAD and the VxWorks ldso accepts exactly 2
-	# ("wrong number of segments (3 != 2)", ldso_7x/libdl/map_object.c). Instead
-	# relink the shared lib from the shipped libsqlite3.a with the soname set by the
-	# linker (2 segments, like every properly built SDK lib), in BOTH 3pp trees.
-	# libyaml.so (unversioned soname "libyaml.so") ships no .a, so it is left as is;
-	# it loads fine on target. Idempotent: skipped once the soname is set and the
-	# lib has 2 LOAD segments (also repairs a lib an older build patchelf-stamped).
-	for D in $(3PP_DEVELOP_DIR)/usr/lib $(3PP_DEPLOY_DIR)/usr/lib; do \
-		[ -f $$D/libsqlite3.a ] || continue; \
-		cur=$$(wr-readelf -d $$D/libsqlite3.so 2>/dev/null | sed -n 's/.*SONAME.*\[\(.*\)\].*/\1/p'); \
-		segs=$$(wr-readelf -lW $$D/libsqlite3.so 2>/dev/null | grep -c '^ *LOAD '); \
-		if [ "$$cur" = "libsqlite3.so.0" ] && [ "$$segs" = 2 ]; then \
-			echo "$$D/libsqlite3.so already SONAME=libsqlite3.so.0 (2 LOAD), skip."; continue; \
-		fi; \
-		real=$$(ls $$D/libsqlite3.so.[0-9]*.[0-9]* 2>/dev/null | head -1); \
-		[ -n "$$real" ] || real=$$D/libsqlite3.so.0.3.50.4; \
-		rm -f $$D/libsqlite3.so $$D/libsqlite3.so.0 "$$real"; \
-		wr-cc -shared -o "$$real" -Wl,-soname,libsqlite3.so.0 \
-			-Wl,--whole-archive $$D/libsqlite3.a -Wl,--no-whole-archive || exit 1; \
-		ln -sf "$$(basename $$real)" $$D/libsqlite3.so.0; \
-		ln -sf libsqlite3.so.0 $$D/libsqlite3.so; \
-		echo "relinked $$real with SONAME=libsqlite3.so.0"; \
+	# SDK 26.03 defects: libsqlite3.so* ship with NO DT_SONAME and libyaml.so with the
+	# unversioned SONAME "libyaml.so" (libyaml's CMake sets no SOVERSION). Neither can
+	# be fixed in place: patchelf appends a 3rd PT_LOAD and the VxWorks ldso accepts
+	# exactly 2 ("wrong number of segments (3 != 2)", ldso_7x/libdl/map_object.c).
+	# ROS 2 builds both from source instead (sqlite_vendor, libyaml_vendor; patches in
+	# vxworks7-layer-for-ros2), so move the SDK copies, plus libcyaml which links the
+	# SDK libyaml, out of both 3pp trees into 3pp/.removed/<tree>/, where
+	# find_package/pkg-config/-l cannot see them. Reversible; idempotent.
+	for T in develop deploy; do \
+		S=$(3PP_DIR)/$$T/usr; R=$(3PP_DIR)/.removed/$$T/usr; \
+		for p in lib/libsqlite3.* include/sqlite3.h include/sqlite3ext.h lib/pkgconfig/sqlite3.pc \
+		         lib/libyaml.* include/yaml.h cmake/yamlConfig.cmake cmake/yamlConfigVersion.cmake \
+		         cmake/yamlTargets.cmake cmake/yamlTargets-*.cmake \
+		         lib/libcyaml.* include/cyaml lib/pkgconfig/libcyaml.pc; do \
+			for f in $$S/$$p; do \
+				[ -e "$$f" ] || [ -L "$$f" ] || continue; \
+				d=$$R/$${f#$$S/}; mkdir -p "$$(dirname "$$d")"; rm -rf "$$d"; mv "$$f" "$$d"; \
+				echo "moved $$f -> $$d"; \
+			done; \
+		done; \
 	done
 endef
 
