@@ -6,7 +6,8 @@ QEMU.
 It ships:
 
 - the **ROS 2 SDK** (`export/root/`) prebuilt for VxWorks
-- the **SDK overlay** (`sdk_overlay/`) — the delta applied to a vanilla VxWorks SDK
+- the **SDK overlay** (`sdk-overlay/`) — the changes installed into a vanilla VxWorks SDK
+  by its own `sdk-overlay/install-sdk-overlay.sh`
 - a bootable **target image** (`ros2.img`)
 - a containerized **dev environment** (`.devcontainer/`) + VS Code tasks (`.vscode/`)
 - helper **scripts** (`scripts/`) — prepare, env, build, run on QEMU
@@ -22,8 +23,8 @@ The toolkit ships as a single tarball. Extract it anywhere you like (it is
 relocatable); everything below runs from the unpacked directory:
 
 ```bash
-tar -xf ros2-vxworks-<release>-<distro>-<arch>.tar.zst   # or .tar.gz
-cd ros2-vxworks-<release>-<distro>-<arch>/               # the toolkit root
+tar -xf toolkit-<release>-<distro>-<arch>.tar.zst   # or .tar.gz
+cd toolkit-<release>-<distro>-<arch>/               # the toolkit root
 ```
 
 All paths in this document are relative to that toolkit root.

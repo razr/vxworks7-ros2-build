@@ -4,7 +4,7 @@
 
 ## Use
 
-1. `tar -xf ros2-vxworks-<release>-<distro>-<arch>.tar.*` and `cd` into it.
+1. `tar -xf toolkit-<release>-<distro>-<arch>.tar.*` and `cd` into it.
 2. Install the Wind River VxWorks SDK (not shipped).
 3. `./scripts/ros2sdk-prepare.sh <sdk>` — apply the overlay (once).
 4. `source ./scripts/ros2sdkenv.sh`

@@ -5,14 +5,13 @@
 #
 #   TOP_BUILDDIR EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR
 #   ROS_DISTRO WIND_RELEASE_ID TGT_ARCH WIND_SDK_HOME
-#   SDK_OVERLAY_DIR SDK_OVERLAY_JSON TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL
+#   SDK_OVERLAY_STAGE TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL
 #
 # It reads no SDK files: everything SDK-specific comes from the SDK overlay.
 #
 # It stages a self-contained toolkit:
-#   sdk_overlay/      - the SDK delta (a build output of 'make sdk-overlay',
-#   sdk_overlay.json    toolkit/make-sdk-overlay.sh) and its inventory
-#   requirements.txt  - host pip tools (colcon/ros2cli/crossenv/...)
+#   sdk-overlay/      - the SDK overlay (a build output of 'make sdk-overlay':
+#                       files/, sdk_overlay.json, install-sdk-overlay.sh)
 #   export/root       - the prebuilt ROS 2 SDK (build apps against this)
 #   ros2.img          - bootable VxWorks target image (CONTAINS the target rootfs
 #                       that would otherwise be export/deploy; not shipped loose)
@@ -26,41 +25,35 @@ die()  { printf 'toolkit FAILED: %s\n' "$*" >&2; exit 1; }
 need() { [ -n "${!1:-}" ] || die "env var $1 is required (run via 'make toolkit')"; }
 
 for v in TOP_BUILDDIR EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR \
-         ROS_DISTRO WIND_SDK_HOME SDK_OVERLAY_DIR SDK_OVERLAY_JSON \
+         ROS_DISTRO WIND_SDK_HOME SDK_OVERLAY_STAGE \
          TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL; do need "$v"; done
 
 STAGE="$TOOLKIT_STAGE"
-OV="$STAGE/sdk_overlay"
 
 # ---------------------------------------------------------------------------
 log "staging at $STAGE"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 
-# --- 1) sdk_overlay/ + sdk_overlay.json (a build output: make sdk-overlay) ----------
-log "1) sdk_overlay/ + sdk_overlay.json (copying the build's SDK overlay)"
-[ -d "$SDK_OVERLAY_DIR" ]  || die "SDK overlay missing ($SDK_OVERLAY_DIR) - run 'make sdk-overlay'"
-[ -f "$SDK_OVERLAY_JSON" ] || die "SDK overlay inventory missing ($SDK_OVERLAY_JSON) - run 'make sdk-overlay'"
-cp -a "$SDK_OVERLAY_DIR" "$OV"
-install -m0644 "$SDK_OVERLAY_JSON" "$STAGE/sdk_overlay.json"
+# --- 1) sdk-overlay/ (a build output: make sdk-overlay) ----------------------
+log "1) sdk-overlay/ (copying the build's SDK overlay)"
+[ -x "$SDK_OVERLAY_STAGE/install-sdk-overlay.sh" ] \
+  || die "SDK overlay missing ($SDK_OVERLAY_STAGE) - run 'make sdk-overlay'"
+cp -a "$SDK_OVERLAY_STAGE" "$STAGE/sdk-overlay"
 
-# --- 2) requirements.txt (host pip tools) -----------------------------------
-log "2) requirements.txt"
-install -m0644 "$TOOLKIT_SRC_DIR/requirements.txt" "$STAGE/requirements.txt"
-
-# --- 3) the ROS 2 SDK: export/root + ros2.img ------------------------------
+# --- 2) the ROS 2 SDK: export/root + ros2.img ------------------------------
 # NOTE: export/deploy is deliberately NOT shipped separately -- it is already
 # inside ros2.img (make image packs it there). Shipping it loose would duplicate
 # the whole target rootfs. extract-deploy.sh can recover it from ros2.img if a
 # user ever needs the loose tree.
-log "3) export/root + ros2.img (copying built artifacts)"
+log "2) export/root + ros2.img (copying built artifacts)"
 [ -d "$ROOT_DIR" ]              || die "export/root missing ($ROOT_DIR) - run 'make'"
 [ -f "$TOP_BUILDDIR/ros2.img" ] || die "ros2.img missing - run 'make image'"
 mkdir -p "$STAGE/export"
 cp -a "$ROOT_DIR"   "$STAGE/export/root"
 cp -a "$TOP_BUILDDIR/ros2.img" "$STAGE/ros2.img"
 
-# --- 4) committed tooling (scripts, shims, devcontainer, vscode, README) ----
-log "4) scripts/ host-shims/ .devcontainer/ .vscode/ README.md"
+# --- 3) committed tooling (scripts, shims, devcontainer, vscode, README) ----
+log "3) scripts/ host-shims/ .devcontainer/ .vscode/ README.md"
 cp -a "$TOOLKIT_SRC_DIR/scripts"       "$STAGE/scripts"
 cp -a "$TOOLKIT_SRC_DIR/host-shims"    "$STAGE/host-shims"
 cp -a "$TOOLKIT_SRC_DIR/.devcontainer" "$STAGE/.devcontainer"
@@ -77,8 +70,8 @@ if [ -f "$RUST_TMPL" ]; then
   log "   staged rust-cargo-config.toml.template (Rust/rclrs support)"
 fi
 
-# --- 5) manifest.json (keys == Makefile vars) + layer pin + build commit ----
-log "5) manifest.json"
+# --- 4) manifest.json (keys == Makefile vars) + layer pin + build commit ----
+log "4) manifest.json"
 PKGMK="$PACKAGE_DIR/ros2/files/$ROS_DISTRO/packages.mk"
 GENMANIFEST="$TOOLKIT_SRC_DIR/scripts/generate-manifest.py"
 # build-repo provenance: the vxworks7-ros2-build commit + describe that produced
@@ -109,8 +102,8 @@ else
   log "   WARN: no packages.mk or generate-manifest.py - skipping manifest"
 fi
 
-# --- 6) RELEASE_NOTES.md (identity from manifest + curated caveats) ---------
-log "6) RELEASE_NOTES.md"
+# --- 5) RELEASE_NOTES.md (identity from manifest + curated caveats) ---------
+log "5) RELEASE_NOTES.md"
 NOTES_IN="$TOOLKIT_SRC_DIR/RELEASE_NOTES.in.md"
 GENNOTES="$TOOLKIT_SRC_DIR/scripts/gen-release-notes.py"
 if [ -f "$STAGE/manifest.json" ] && [ -f "$GENNOTES" ]; then
@@ -121,8 +114,8 @@ else
   log "   WARN: no manifest.json or gen-release-notes.py - skipping RELEASE_NOTES.md"
 fi
 
-# --- 7) tar it --------------------------------------------------------------
-log "7) packaging -> $TOOLKIT_TARBALL"
+# --- 6) tar it --------------------------------------------------------------
+log "6) packaging -> $TOOLKIT_TARBALL"
 STAGE_PARENT="$(dirname "$STAGE")"
 STAGE_BASE="$(basename "$STAGE")"
 if command -v zstd >/dev/null 2>&1 && [[ "$TOOLKIT_TARBALL" == *.zst ]]; then

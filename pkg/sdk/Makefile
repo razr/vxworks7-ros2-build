@@ -57,16 +57,17 @@ sdk.build : sdk.configure
 sdk.install : sdk.build
 	@$(call echo_action,Installing extra SDK packages,$*)
 	$(call sdk_install,$*)
-	# Generic Python fast-start host tool (release-independent), on PATH after
-	# sdkenv.sh: optimize-python-startup <root> -> unchecked-hash .pyc +
-	# importlib.metadata launchers. Used by python_prepare_deploy + the toolkit.
-	install -D -m0755 files/optimize-python-startup.py $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/optimize-python-startup
 	@$(MAKE_STAMP)
 
 sdk.deploy : sdk.install
 	@$(call echo_action,Deploying SDK artifacts,$*)
 	$(call sdk_deploy,$*)
 	@$(MAKE_STAMP)
+
+# sdk.get-pip-url - print python_fix's pip bootstrap URL (mk/usr/make-sdk-overlay.sh)
+.PHONY: sdk.get-pip-url
+sdk.get-pip-url:
+	@echo $(GET_PIP_URL)
 
 sdk.clean:
 	@$(call echo_action,Cleaning,$*)

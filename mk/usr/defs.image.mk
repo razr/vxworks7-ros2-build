@@ -8,7 +8,7 @@
 # longer re-dd the image when nothing changed.
 #
 # Included from the top-level Makefile. Depends on: TOP_BUILDDIR, DEPLOY_DIR,
-# STAMP_DIR, DEFAULT_BUILD, the python_prepare_deploy macro (defs.python.mk).
+# STAMP_DIR, DEFAULT_BUILD. It only packs export/deploy as `make fs` left it.
 # The `image` phony target itself is declared in the top-level Makefile, which
 # calls the build_fs macro defined below via the $(ROS2_IMG) file rule.
 
@@ -27,24 +27,6 @@ define build_fs
 	mkfs.vfat -F 32 $(1)
 	mkdir -p $(TOP_BUILDDIR)/mount
 	fusefat -o rw+ $(1) $(TOP_BUILDDIR)/mount
-	# Prepare the deployed python for the target (mk/usr/defs.python.mk ->
-	# optimize-python-startup (pkg/sdk)): strip __pycache__ (build-time
-	# caches may be host-arch, e.g. cpython-312), pre-compile unchecked-hash .pyc
-	# so the target never recompiles on its slow FS, and rewrite the setuptools
-	# EASY-INSTALL launchers in bin/ and lib/<pkg>/ to importlib.metadata (the
-	# pkg_resources shims scan all *.dist-info at startup -- minutes on target).
-	$(call python_prepare_deploy,$(TOP_BUILDDIR)/export/deploy)
-	# Prune build/dev-only artifacts the TARGET never needs at runtime, to cut the
-	# fusefat copy's per-file cost (file count dominates the FUSE write time).
-	# KEEP *.dist-info / *.egg-info (ros2 run entry-point discovery reads them) and
-	# the CPython stdlib test dir ($(TOP_BUILDDIR)/export/deploy/lib/python3.9/test).
-	find $(TOP_BUILDDIR)/export/deploy \( -path '*/cmake/*' -o -name '*.cmake' \) -type f -delete
-	# remove the now-empty cmake/ dir trees left behind (bottom-up, nested empties)
-	find $(TOP_BUILDDIR)/export/deploy -depth -type d -path '*/cmake*' -empty -delete
-	find $(TOP_BUILDDIR)/export/deploy/lib -type d \( -name test -o -name tests \) \
-	    -not -path '*/python3.*/test' -not -path '*/python3.*/test/*' -exec rm -rf {} +
-	find $(TOP_BUILDDIR)/export/deploy/lib -type d -name include -not -path '*/python3.*/*' -exec rm -rf {} +
-	find $(TOP_BUILDDIR)/export/deploy \( -name '*.a' -o -name '*.pc' \) -type f -delete
 	cp --no-preserve=ownership -r -L $(TOP_BUILDDIR)/export/deploy/* $(TOP_BUILDDIR)/mount/. 2>/dev/null
 	fusermount -u $(TOP_BUILDDIR)/mount
 endef

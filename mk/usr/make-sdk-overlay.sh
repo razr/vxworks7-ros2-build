@@ -1,16 +1,31 @@
 #!/usr/bin/env bash
-# make-sdk-overlay.sh - generate the SDK overlay: the delta that turns a vanilla
+# make-sdk-overlay.sh - generate the SDK overlay: the changes that turn a vanilla
 # VxWorks SDK into the SDK this build used. Invoked by `make sdk-overlay`
-# (mk/usr/defs.toolkit.mk::build_sdk_overlay) with these vars in the environment:
+# (mk/usr/defs.sdk_overlay.mk::build_sdk_overlay) with these vars in the environment:
 #
 #   TOP_BUILDDIR PACKAGE_DIR BUILDSPECS_DIR WIND_CC_SYSROOT WIND_SDK_HOME
-#   SDK_OVERLAY_DIR SDK_OVERLAY_JSON
+#   WIND_RELEASE_ID SDK_OVERLAY_STAGE SDK_OVERLAY_TARBALL SDK_OVERLAY_INSTALLER
 #
-# Output (a build output, like export/root and ros2.img; `make toolkit` packs it):
-#   $SDK_OVERLAY_DIR/   - the SDK delta, generated from the build inputs
-#                         (buildspecs/cmake, pkg/sdk/files, built unixextra, the
-#                         patched SDK's host bin + rust) - NOT from a diff.
-#   $SDK_OVERLAY_JSON   - inventory: files to copy, SDK files to move aside.
+# Output (a build output, like export/root and ros2.img):
+#   $SDK_OVERLAY_STAGE/files/                  files to copy into the SDK, laid out
+#                                              like the SDK root
+#   $SDK_OVERLAY_STAGE/sdk_overlay.json        inventory per step: those files, the
+#                                              SDK files to move aside, pip packages
+#   $SDK_OVERLAY_STAGE/install-sdk-overlay.sh  installs it into an SDK (<step>_install)
+#   $SDK_OVERLAY_TARBALL                       the staging directory, archived
+#
+# One function per step that changes the SDK, named after that step, in the
+# order the build runs them (pkg/sdk/files/<rel>/defs.sdk.mk, pkg/sdk/Makefile,
+# pkg/unixextra/Makefile):
+#
+#   pkg/sdk  sdk.patch    -> sdk_patch   -> sdk_fix          sdk_fix_overlay
+#                                         -> python_fix       python_fix_overlay
+#            (defined, not called)           vxworks_fix      vxworks_fix_overlay
+#            sdk.install  -> sdk_install                      sdk_install_overlay
+#                                         -> rust_fix         rust_fix_overlay
+#            sdk.deploy   -> sdk_deploy  (target image only)  -
+#   pkg/unixextra  unixextra.install (+ default.conf edit)    unixextra_install_overlay
+#   not a build step: buildspecs/cmake toolchain              toolchain_overlay
 set -euo pipefail
 
 log()  { printf '  sdk-overlay: %s\n' "$*"; }
@@ -18,109 +33,197 @@ die()  { printf 'sdk-overlay FAILED: %s\n' "$*" >&2; exit 1; }
 need() { [ -n "${!1:-}" ] || die "env var $1 is required (run via 'make sdk-overlay')"; }
 
 for v in TOP_BUILDDIR PACKAGE_DIR BUILDSPECS_DIR WIND_CC_SYSROOT WIND_SDK_HOME \
-         SDK_OVERLAY_DIR SDK_OVERLAY_JSON; do need "$v"; done
+         WIND_RELEASE_ID SDK_OVERLAY_STAGE SDK_OVERLAY_TARBALL SDK_OVERLAY_INSTALLER; do need "$v"; done
 
-OV="$SDK_OVERLAY_DIR"
-OV_JSON="$SDK_OVERLAY_JSON"
+STAGE="$SDK_OVERLAY_STAGE"
+OV="$STAGE/files"
+SDK_OVERLAY_JSON="$STAGE/sdk_overlay.json"
 HOSTBIN_REL="vxsdk/host/x86_64-linux/bin"
 SYSROOT_REL="vxsdk/sysroot"
-UNIXEXTRA_SRC="$TOP_BUILDDIR/build/unixextra/src"
 SDK_HOSTBIN="$WIND_SDK_HOME/$HOSTBIN_REL"
+OV_HOSTBIN="$OV/$HOSTBIN_REL"
+OV_SYSROOT="$OV/$SYSROOT_REL"
+SDK_FILES="$PACKAGE_DIR/sdk/files"
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+REMOVED_LIST="$WORK/removed"; : > "$REMOVED_LIST"
+REQUIREMENTS="$WORK/requirements"; : > "$REQUIREMENTS"
+GET_PIP="$WORK/get-pip-url"; : > "$GET_PIP"
 
-rm -rf "$OV" "$OV_JSON"; mkdir -p "$OV"
+# Each step function records the files it added (in $STEPS/<nn>-<step>), so the
+# inventory lists them per step and ros2sdk-prepare.sh applies them per step.
+STEPS="$WORK/steps"; mkdir -p "$STEPS"; STEP_NO=0
+snapshot() { ( cd "$OV" && find . \( -type f -o -type l \) | sort ) > "$WORK/before"; }
+record()   { # record <step>: save the files added since snapshot to $STEPS
+  STEP_NO=$((STEP_NO + 1))
+  ( cd "$OV" && find . \( -type f -o -type l \) | sort ) | comm -13 "$WORK/before" - \
+    | sed 's#^\./##' > "$STEPS/$(printf '%02d' "$STEP_NO")-$1"
+}
+listed()   { tr '\n' ' ' < "$(ls "$STEPS"/*-"$1")"; }   # files recorded for <step>
 
-# --- 1) sdk_overlay/ from the build inputs ----------------------------------
-log "1) building sdk_overlay/"
+# --- pkg/sdk sdk_fix ---------------------------------------------------------------
+sdk_fix_overlay() {
+  snapshot
+  # defs.autotools.mk copied into the SDK's mk/
+  install -D -m0644 "$SDK_FILES/defs.autotools.mk" "$OV_SYSROOT/mk/defs.autotools.mk"
+  # SDK sqlite/libyaml/libcyaml moved to 3pp/.removed/<tree>/: taken from what the
+  # build actually moved
+  local rm_root="$WIND_CC_SYSROOT/usr/3pp/.removed"
+  if [ -d "$rm_root" ]; then
+    ( cd "$rm_root" && find . -mindepth 2 \( -type f -o -type l \) ) | sed 's#^\./##' \
+      | sed "s#^#$SYSROOT_REL/usr/3pp/#" | LC_ALL=C sort > "$REMOVED_LIST"
+  fi
+  record sdk_fix
+  log "sdk_fix: $(listed sdk_fix)+ $(wc -l < "$REMOVED_LIST") SDK file(s) to move aside"
+}
 
-# 1a) cmake toolchain + Platform  <- buildspecs/cmake (repo)
-install -D -m0644 "$BUILDSPECS_DIR/cmake/toolchain.cmake"        "$OV/$SYSROOT_REL/mk/toolchain.cmake"
-install -D -m0644 "$BUILDSPECS_DIR/cmake/Platform/VxWorks.cmake" "$OV/$SYSROOT_REL/mk/Platform/VxWorks.cmake"
+# --- pkg/sdk vxworks_fix ------------------------------------------------------------
+# Defined in defs.sdk.mk but not called by sdk_patch: it changes nothing in the SDK.
+vxworks_fix_overlay() {
+  snapshot
+  record vxworks_fix
+  log "vxworks_fix: not called by sdk_patch, nothing"
+}
 
-# 1b) defs.autotools.mk  <- pkg/sdk/files (repo)
-install -D -m0644 "$PACKAGE_DIR/sdk/files/defs.autotools.mk"     "$OV/$SYSROOT_REL/mk/defs.autotools.mk"
+# --- pkg/sdk python_fix -------------------------------------------------------------
+python_fix_overlay() {
+  snapshot
+  # python3/python links to python3.9
+  mkdir -p "$OV_HOSTBIN"
+  ln -sf python3.9 "$OV_HOSTBIN/python3"
+  ln -sf python3.9 "$OV_HOSTBIN/python"
+  # pip: bootstrapped with get-pip.py, not a file here (the URL goes into the
+  # inventory; install-sdk-overlay.sh runs it the same way)
+  make -s --no-print-directory -C "$PACKAGE_DIR/sdk" sdk.get-pip-url > "$GET_PIP" \
+    || die "python_fix: cannot read GET_PIP_URL from pkg/sdk"
+  grep -qx 'https://[^ ]*' "$GET_PIP" || die "python_fix: GET_PIP_URL is not a URL: $(cat "$GET_PIP")"
+  record python_fix
+  log "python_fix: $(listed python_fix)+ pip via $(cat "$GET_PIP")"
+}
 
-# 1c) unixextra lib + the EXACTLY 7 headers it installs  <- built unixextra src
-[ -d "$UNIXEXTRA_SRC" ] || die "unixextra build dir missing: $UNIXEXTRA_SRC (run 'make' first)"
-install -D -m0644 "$UNIXEXTRA_SRC/libunixextra.a"    "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.a"
-install -D -m0755 "$UNIXEXTRA_SRC/libunixextra.so.1" "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.so.1"
-ln -sf libunixextra.so.1 "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.so"
-UX_H="$OV/$SYSROOT_REL/usr/h/published/UTILS_UNIX"
-# Overlay ONLY the UTILS_UNIX headers unixextra ACTUALLY installed into the SDK
-# sysroot -- do NOT hardcode the list from $UNIXEXTRA_SRC. unixextra's install is
-# version-aware (pkg/unixextra/Makefile: for WIND_RELEASE_ID major > 23 it drops
-# pthread_getname.c from SOURCES, so pthread.h is NOT installed because VxWorks
-# libc already provides pthread_getname_np/pthread_setname_np). Copying a fixed
-# list from the source tree re-introduced a stale pthread.h whose const-char*
-# signature conflicts with libc/public pthread.h and breaks find_package(Threads)
-# (e.g. libxml2_vendor). Mirroring the installed set keeps the toolkit in lockstep
-# with unixextra's own version logic -- no duplicated MAJOR_VERSION check to drift.
-UX_SYSROOT_H="$WIND_CC_SYSROOT/usr/h/published/UTILS_UNIX"
-[ -d "$UX_SYSROOT_H" ] || die "unixextra headers not installed in sysroot: $UX_SYSROOT_H (run 'make unixextra' first)"
-( cd "$UX_SYSROOT_H" && find . -name '*.h' -print ) | while IFS= read -r rel; do
-  install -D -m0644 "$UX_SYSROOT_H/$rel" "$UX_H/$rel"
-done
+# --- pkg/sdk sdk_install --------------------------------------------------------------
+# pip install -r requirements.txt, shebang rewrite and crossenv are not files: the
+# requirements go into the inventory, ros2sdk-prepare.sh runs pip and crossenv.
+sdk_install_overlay() {
+  snapshot
+  local req="$SDK_FILES/$WIND_RELEASE_ID/requirements.txt"
+  [ -f "$req" ] && cp "$req" "$REQUIREMENTS"
+  # Python fast-start tool installed into the host bin
+  install -D -m0755 "$SDK_HOSTBIN/optimize-python-startup" "$OV_HOSTBIN/optimize-python-startup"
+  record sdk_install
+  log "sdk_install: $(listed sdk_install)+ $(grep -cv '^\s*\(#\|$\)' "$REQUIREMENTS" || true) pip package(s) to install"
+}
 
-# 1d) cc-conf/default.conf (carries the -lunixextra link edit)  <- patched SDK
-grep -q 'lunixextra' "$WIND_CC_SYSROOT/cc-conf/default.conf" \
-  || die "patched SDK default.conf has no -lunixextra (is the SDK patched? run 'make sdk')"
-install -D -m0644 "$WIND_CC_SYSROOT/cc-conf/default.conf" "$OV/$SYSROOT_REL/cc-conf/default.conf"
-
-# 1e) host bin: pip/python launchers + symlinks + cargo-ament-build +
-#     optimize-python-startup  <- patched SDK
-install -D -m0755 "$SDK_HOSTBIN/pip3.9"           "$OV/$HOSTBIN_REL/pip3.9"
-install -D -m0755 "$SDK_HOSTBIN/cargo-ament-build" "$OV/$HOSTBIN_REL/cargo-ament-build"
-install -D -m0755 "$SDK_HOSTBIN/optimize-python-startup" "$OV/$HOSTBIN_REL/optimize-python-startup"
-ln -sf pip3.9    "$OV/$HOSTBIN_REL/pip"
-ln -sf pip3.9    "$OV/$HOSTBIN_REL/pip3"
-ln -sf python3.9 "$OV/$HOSTBIN_REL/python"
-ln -sf python3.9 "$OV/$HOSTBIN_REL/python3"
-
-# 1f) rust fixups: .cargo/config.toml + patched libloading  <- patched SDK
-RUST_SRC="$WIND_CC_SYSROOT/usr/rust"
-if [ -f "$RUST_SRC/.cargo/config.toml" ]; then
-  install -D -m0644 "$RUST_SRC/.cargo/config.toml" "$OV/$SYSROOT_REL/usr/rust/.cargo/config.toml"
-  if [ -d "$RUST_SRC/vxworks-crates/libloading" ]; then
-    LL_DST="$OV/$SYSROOT_REL/usr/rust/vxworks-crates/libloading"
-    mkdir -p "$LL_DST/src"
-    cp -a "$RUST_SRC/vxworks-crates/libloading/src/." "$LL_DST/src/"
+# --- pkg/sdk rust_fix (called by sdk_install) ---------------------------------------
+rust_fix_overlay() {
+  snapshot
+  local rust="$WIND_CC_SYSROOT/usr/rust" ll="$WIND_CC_SYSROOT/usr/rust/vxworks-crates/libloading"
+  if [ ! -f "$rust/.cargo/config.toml" ]; then
+    record rust_fix
+    log "rust_fix: no rust_fix files in the SDK (build without Rust)"
+    return
+  fi
+  # patched libloading in usr/rust/vxworks-crates/
+  if [ -d "$ll" ]; then
+    mkdir -p "$OV_SYSROOT/usr/rust/vxworks-crates/libloading/src"
+    cp -a "$ll/src/." "$OV_SYSROOT/usr/rust/vxworks-crates/libloading/src/"
     for f in Cargo.toml Cargo.lock LICENSE; do
-      [ -f "$RUST_SRC/vxworks-crates/libloading/$f" ] && cp -a "$RUST_SRC/vxworks-crates/libloading/$f" "$LL_DST/$f"
+      [ -f "$ll/$f" ] && cp -a "$ll/$f" "$OV_SYSROOT/usr/rust/vxworks-crates/libloading/$f"
     done
   fi
-else
-  log "   (no rust fixups in SDK - skipping; toolkit without Rust)"
-fi
-
-# --- 2) sdk_overlay.json inventory ------------------------------------------
-log "2) sdk_overlay.json"
-( cd "$OV" && find . -type f -o -type l ) | sed 's#^\./##' | LC_ALL=C sort > "$TOP_BUILDDIR/.ovlist"
-# SDK files the build moved out of the way (pkg/sdk sdk_fix -> 3pp/.removed/<tree>/,
-# e.g. the SDK sqlite/libyaml that ROS 2 builds as vendors). Mirrored from what
-# the build actually moved, so the list cannot drift from defs.sdk.mk.
-RM_ROOT="$WIND_CC_SYSROOT/usr/3pp/.removed"
-: > "$TOP_BUILDDIR/.rmlist"
-if [ -d "$RM_ROOT" ]; then
-  ( cd "$RM_ROOT" && find . -mindepth 2 \( -type f -o -type l \) ) | sed 's#^\./##' \
-    | sed "s#^#$SYSROOT_REL/usr/3pp/#" | LC_ALL=C sort > "$TOP_BUILDDIR/.rmlist"
-fi
-python3 - "$TOP_BUILDDIR/.ovlist" "$OV_JSON" "$TOP_BUILDDIR/.rmlist" <<'PY'
-import json, sys
-files = [l.strip() for l in open(sys.argv[1]) if l.strip()]
-removed = [l.strip() for l in open(sys.argv[3]) if l.strip()]
-doc = {
-  "description": "Files copied verbatim into the vanilla VxWorks SDK by "
-                 "scripts/ros2sdk-prepare.sh (cp -a sdk_overlay/. $WRSDK/), and SDK "
-                 "files it moves aside (removed: <3pp>/<tree>/X -> <3pp>/.removed/<tree>/X). "
-                 "Paths relative to SDK root.",
-  "files": files,
-  "removed": removed,
-  "pip_requirements": "requirements.txt",
-  "crossenv": {"regenerate": True,
-               "path": "vxsdk/host/x86_64-linux/cross_venv/cross"},
+  # SDK cargo config from sdk-cargo-config-vxworks.toml.template
+  install -D -m0644 "$rust/.cargo/config.toml" "$OV_SYSROOT/usr/rust/.cargo/config.toml"
+  # patched cargo-ament-build in the host bin
+  install -D -m0755 "$SDK_HOSTBIN/cargo-ament-build" "$OV_HOSTBIN/cargo-ament-build"
+  record rust_fix
+  log "rust_fix: $(listed rust_fix)"
 }
-json.dump(doc, open(sys.argv[2], "w"), indent=2)
-open(sys.argv[2], "a").write("\n")
-PY
-rm -f "$TOP_BUILDDIR/.ovlist" "$TOP_BUILDDIR/.rmlist"
 
-log "done: $OV + $OV_JSON"
+# --- pkg/unixextra unixextra.install ------------------------------------------------
+unixextra_install_overlay() {
+  snapshot
+  local stage="$WORK/unixextra"
+  # install: unixextra's own install (pkg/unixextra unixextra.stage: same
+  # options and SOURCES as unixextra.install) into a scratch DESTDIR
+  mkdir -p "$stage"
+  make -s --no-print-directory -C "$PACKAGE_DIR/unixextra" unixextra.stage UNIXEXTRA_DESTDIR="$stage" >/dev/null \
+    || die "unixextra.stage failed (run 'make' first)"
+  mkdir -p "$OV_SYSROOT"
+  cp -a "$stage/usr" "$OV_SYSROOT/"
+  # install copies the libunixextra.so symlink as a second file; keep it a symlink.
+  ln -sf libunixextra.so.1 "$OV_SYSROOT/usr/lib/common/libunixextra.so"
+  # sed: -lunixextra in the compiler driver's default link line
+  grep -q 'lunixextra' "$WIND_CC_SYSROOT/cc-conf/default.conf" \
+    || die "SDK default.conf has no -lunixextra (run 'make' first)"
+  install -D -m0644 "$WIND_CC_SYSROOT/cc-conf/default.conf" "$OV_SYSROOT/cc-conf/default.conf"
+  record unixextra.install
+  log "unixextra.install: $(listed unixextra.install)"
+}
+
+# --- buildspecs/cmake (not a build step) --------------------------------------------
+# The build passes buildspecs/cmake/toolchain.cmake directly (vxworks mixin); it
+# never installs it into the SDK. A toolkit user gets it in the SDK's mk/, where
+# ros2sdk-prepare.sh points the relocated mixin.
+toolchain_overlay() {
+  snapshot
+  install -D -m0644 "$BUILDSPECS_DIR/cmake/toolchain.cmake"        "$OV_SYSROOT/mk/toolchain.cmake"
+  install -D -m0644 "$BUILDSPECS_DIR/cmake/Platform/VxWorks.cmake" "$OV_SYSROOT/mk/Platform/VxWorks.cmake"
+  record toolchain
+  log "toolchain: $(listed toolchain)"
+}
+
+# --- inventory ---------------------------------------------------------------------
+# "steps": one entry per step function above, in the same order and with the same
+# name, holding exactly that step's changes. install-sdk-overlay.sh installs them
+# in this order (<step>_install).
+write_inventory() {
+  python3 - "$STEPS" "$REMOVED_LIST" "$REQUIREMENTS" "$GET_PIP" "$SDK_OVERLAY_JSON" <<'PY'
+import json, os, sys
+steps_dir, removed, reqs, get_pip, out = sys.argv[1:6]
+lines = lambda p: [l.strip() for l in open(p) if l.strip()]
+steps = {}
+for f in sorted(os.listdir(steps_dir)):
+    steps[f.split("-", 1)[1]] = {"files": lines(os.path.join(steps_dir, f))}
+steps["sdk_fix"]["removed"] = lines(removed)
+steps["python_fix"]["get_pip"] = open(get_pip).read().strip()
+steps["sdk_install"]["pip_requirements"] = [l for l in lines(reqs) if not l.startswith("#")]
+steps["sdk_install"]["crossenv"] = "vxsdk/host/x86_64-linux/cross_venv/cross"
+doc = {
+  "description": "SDK overlay, per build step (mk/usr/make-sdk-overlay.sh). "
+                 "install-sdk-overlay.sh installs the steps in order: copies each "
+                 "step's 'files' from files/ into the SDK, moves 'removed' aside "
+                 "(<3pp>/<tree>/X -> <3pp>/.removed/<tree>/X), bootstraps pip with 'get_pip', pip installs "
+                 "'pip_requirements' with the SDK python and creates 'crossenv'. "
+                 "Paths relative to the SDK root.",
+  "steps": steps,
+}
+json.dump(doc, open(out, "w"), indent=2)
+open(out, "a").write("\n")
+print(" ".join("%s:%d" % (k, len(v["files"])) for k, v in steps.items()))
+PY
+}
+
+# --- archive -----------------------------------------------------------------------
+write_archive() {
+  local parent base; parent="$(dirname "$STAGE")"; base="$(basename "$STAGE")"
+  if command -v zstd >/dev/null 2>&1 && [[ "$SDK_OVERLAY_TARBALL" == *.zst ]]; then
+    tar -C "$parent" -cf - "$base" | zstd -19 -T0 -q -o "$SDK_OVERLAY_TARBALL" -f
+  else
+    SDK_OVERLAY_TARBALL="${SDK_OVERLAY_TARBALL%.zst}"; SDK_OVERLAY_TARBALL="${SDK_OVERLAY_TARBALL%.tar}.tar.gz"
+    tar -C "$parent" -czf "$SDK_OVERLAY_TARBALL" "$base"
+  fi
+  log "archive: $SDK_OVERLAY_TARBALL"
+}
+
+rm -rf "$STAGE" "$SDK_OVERLAY_TARBALL"; mkdir -p "$OV"
+sdk_fix_overlay
+python_fix_overlay
+vxworks_fix_overlay
+sdk_install_overlay
+rust_fix_overlay
+unixextra_install_overlay
+toolchain_overlay
+log "inventory: $(write_inventory) -> $SDK_OVERLAY_JSON"
+install -m0755 "$SDK_OVERLAY_INSTALLER" "$STAGE/install-sdk-overlay.sh"
+write_archive
+log "done: $STAGE"

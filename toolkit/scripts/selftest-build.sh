@@ -15,7 +15,8 @@
 #        python = ament_python  "Hello from Python, world!" (rclpy)
 #   4) ONE `colcon build --merge-install --mixin vxworks` of the whole workspace
 #   5) assert each compiled artifact (cpp/rust) is a VxWorks (x86-64, ld64.so.1) RTP
-#   6) stage the merged install/ tree onto the USB dir (-> /bd0a); the matching
+#   6) Python: optimize-python-startup on install/ (unchecked-hash .pyc + launchers)
+#   7) stage the merged install/ tree onto the USB dir (-> /bd0a); the matching
 #      on-target proc (test09/test10/test11) runs it from /bd0a. ros2.img untouched.
 #
 # Usage:
@@ -24,7 +25,7 @@
 #
 # All inputs auto-default, so from the build tree with the SDK env sourced you can
 # just run `selftest-build.sh` with no args:
-#   --toolkit  : newest output/ros2-vxworks-*.tar.* (else output/<kit-dir>)
+#   --toolkit  : newest output/toolkit-*.tar.* (else output/<kit-dir>)
 #   --sdk  : $WIND_SDK_HOME / $WIND_HOME / $WRSDK (whichever has sdkenv.sh)
 #   --img  : the toolkit's OWN shipped image ($TOOLKIT_ROOT/ros2.img)
 #   --lang : all (default) builds C++ + Rust + Python; or pick one
@@ -73,10 +74,10 @@ die()  { printf 'SELFTEST-BUILD FAIL: %s\n' "$*" >&2; exit 1; }
 # --- defaults ---------------------------------------------------------------
 # --toolkit: newest toolkit tarball under output/, else a single unpacked toolkit dir there.
 if [ -z "$TOOLKIT_SRC" ]; then
-  TOOLKIT_SRC="$(ls -t "$OUT_DIR"/ros2-vxworks-*.tar.zst \
-                    "$OUT_DIR"/ros2-vxworks-*.tar.gz \
-                    "$OUT_DIR"/ros2-vxworks-*.tgz 2>/dev/null | head -1 || true)"
-  [ -n "$TOOLKIT_SRC" ] || TOOLKIT_SRC="$(find "$OUT_DIR" -maxdepth 1 -type d -name 'ros2-vxworks-*' 2>/dev/null | head -1 || true)"
+  TOOLKIT_SRC="$(ls -t "$OUT_DIR"/toolkit-*.tar.zst \
+                    "$OUT_DIR"/toolkit-*.tar.gz \
+                    "$OUT_DIR"/toolkit-*.tgz 2>/dev/null | head -1 || true)"
+  [ -n "$TOOLKIT_SRC" ] || TOOLKIT_SRC="$(find "$OUT_DIR" -maxdepth 1 -type d -name 'toolkit-*' ! -name toolkit-build 2>/dev/null | head -1 || true)"
   [ -n "$TOOLKIT_SRC" ] || die "no toolkit under $OUT_DIR (run 'make toolkit' first, or pass --toolkit)"
   say "auto --toolkit $TOOLKIT_SRC"
 fi
@@ -300,7 +301,7 @@ for lang in $LANGS; do
   esac
 done
 
-# --- 5b) Python: prepare install/ for a fast start on the target -----------
+# --- 6) Python: prepare install/ for a fast start on the target -----------
 # Same step the image build runs (python_prepare_deploy): unchecked-hash .pyc
 # (target loads bytecode as-is, never recompiles on its slow FS) and rewrite of
 # the ament_python EASY-INSTALL launcher, which imports pkg_resources + scans the
@@ -310,14 +311,14 @@ case " $LANGS " in
   *" python "*)
     OPS="$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/optimize-python-startup"
     [ -x "$OPS" ] || die "[python] optimize-python-startup not in the SDK host bin (toolkit SDK overlay not applied?)"
-    say "5b) optimize-python-startup $INSTALL"
+    say "6) optimize-python-startup $INSTALL"
     "$WIND_SDK_HOME/vxsdk/host/x86_64-linux/bin/python3" "$OPS" "$INSTALL" \
       || die "[python] optimize-python-startup failed"
     ;;
 esac
 
-# --- 6) stage the merged install tree onto the USB dir (image untouched) ----
-say "6) stage merged install/ -> USB dir $USB_DIR (-> /bd0a; ros2.img untouched)"
+# --- 7) stage the merged install tree onto the USB dir (image untouched) ----
+say "7) stage merged install/ -> USB dir $USB_DIR (-> /bd0a; ros2.img untouched)"
 cp -a "$INSTALL/." "$USB_DIR/" || die "staging merged install/ to USB failed"
 
 # Map lang -> on-target test proc by naming (tests/test*-toolkit-<lang>-*.exp), the
@@ -340,10 +341,10 @@ printf '\nRun the on-target half (USB dir -> /bd0a; image untouched):\n  VX_USB=
 # Machine-readable handoff for CI (source it, or read individual keys). Paths are
 # absolute so the on-target job can consume them without re-deriving defaults.
 cat > "$WORKDIR/selftest.env" <<EOF
-VX_USB=$USB_DIR
-VX_IMG=$IMG
-VX_TESTS=$TESTS
-VX_MAIN_SCRIPT=$MAIN_SCRIPT
+VX_USB="$USB_DIR"
+VX_IMG="$IMG"
+VX_TESTS="$TESTS"
+VX_MAIN_SCRIPT="$MAIN_SCRIPT"
 EOF
 say "wrote $WORKDIR/selftest.env (VX_USB / VX_IMG / VX_TESTS / VX_MAIN_SCRIPT)"
 

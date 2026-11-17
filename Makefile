@@ -9,6 +9,7 @@ include $(WIND_USR_MK)/defs.vxworks.mk
 include $(WIND_USR_MK)/defs.python.mk
 include $(WIND_USR_MK)/defs.fs.mk
 include $(WIND_USR_MK)/defs.image.mk
+include $(WIND_USR_MK)/defs.sdk_overlay.mk
 include $(WIND_USR_MK)/defs.toolkit.mk
 include $(WIND_USR_MK)/defs.info.mk
 include $(WIND_USR_MK)/defs.examples.mk
@@ -37,20 +38,28 @@ endif
 all: $(DOWNLOADS_DIR) $(STAMP_DIR) $(EXPORT_DIR)
 	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.install || exit 1; done;
 
-# fs - lay out export/deploy from the built packages (defs.fs.mk::fs_deploy).
+# fs - lay out export/deploy from the built packages and prepare it for the target
+# (defs.fs.mk::fs_deploy, fs_prepare_deploy).
 fs: all
 	$(call fs_deploy)
+	$(call fs_prepare_deploy)
 
-# sdk-overlay - generate output/sdk_overlay/ + sdk_overlay.json, the SDK delta
-# (defs.toolkit.mk::build_sdk_overlay).
+# sdk-overlay - make the SDK overlay: output/sdk-overlay-build/<name>/ + the
+# output/<name>.tar.zst archive (defs.sdk_overlay.mk::build_sdk_overlay).
 sdk-overlay: all
 	$(call build_sdk_overlay)
+
+# The SDK overlay as a file prerequisite (its installer in the staging dir): made
+# by `make sdk-overlay` when missing, used as is when present (e.g. the CI toolkit
+# job, which downloads it instead of building).
+$(SDK_OVERLAY_STAGE)/install-sdk-overlay.sh:
+	$(MAKE) sdk-overlay
 
 # image - pack the bootable FAT32 ros2.img (defs.image.mk::build_fs).
 image: fs $(ROS2_IMG)
 
 # toolkit - assemble the ROS 2 VxWorks SDK delivery kit (defs.toolkit.mk::build_toolkit).
-toolkit:
+toolkit: $(SDK_OVERLAY_STAGE)/install-sdk-overlay.sh
 	$(call build_toolkit)
 
 # examples - build the example container images (defs.examples.mk::build_examples).
