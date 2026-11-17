@@ -46,6 +46,26 @@ set -u
 export WIND_CC_SYSROOT="${WIND_CC_SYSROOT:-$WIND_SDK_CC_SYSROOT}"
 PIP="$WRSDK/$HOSTBIN_REL/pip3"
 PY="$WRSDK/$HOSTBIN_REL/python3"
+
+# --- 1b) move aside the SDK files the build replaced (sdk_overlay.json "removed") ---
+# e.g. the SDK sqlite/libyaml: ROS 2 ships its own (sqlite_vendor, libyaml_vendor)
+# with versioned SONAMEs, so the SDK copies must not be found first. Same layout
+# as the build (<3pp>/<tree>/X -> <3pp>/.removed/<tree>/X); reversible, idempotent.
+"$PY" - "$TOOLKIT_DIR/sdk_overlay.json" "$WRSDK" <<'PYEOF' || die "moving aside SDK files failed"
+import json, os, shutil, sys
+doc = json.load(open(sys.argv[1])); sdk = sys.argv[2]; n = 0
+for rel in doc.get("removed", []):
+    src = os.path.join(sdk, rel)
+    if not (os.path.lexists(src)):
+        continue
+    head, tree_rest = rel.split("/usr/3pp/", 1)
+    dst = os.path.join(sdk, head, "usr/3pp/.removed", tree_rest)
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    if os.path.lexists(dst):
+        os.remove(dst) if not os.path.isdir(dst) or os.path.islink(dst) else shutil.rmtree(dst)
+    shutil.move(src, dst); n += 1
+print("== 1b) moved aside %d SDK file(s) replaced by the ROS 2 SDK" % n)
+PYEOF
 [ -x "$PIP" ] || die "pip3 missing after overlay ($PIP)"
 
 # --- 2) install host Python tools (colcon, ros2cli, crossenv, ...) ----------

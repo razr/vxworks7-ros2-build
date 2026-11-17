@@ -95,6 +95,21 @@ if {[llength $selectors] == 0} {
         lappend test_scripts $path
     }
 }
+# Toolkit tests (test*-toolkit-*) run a node that toolkit/scripts/selftest-build.sh
+# built and staged on a USB dir; without VX_USB there is nothing to run. Skip them
+# up front instead of booting into a missing /bd0a. selftest-build.sh selects the
+# same tests by the same naming (test*-toolkit-<lang>-*), so the two stay aligned.
+if {![info exists ::env(VX_USB)] || $::env(VX_USB) eq "" || ![file isdirectory $::env(VX_USB)]} {
+    set kept {}
+    foreach t $test_scripts {
+        if {[string match "*-toolkit-*" [file tail $t]]} {
+            puts "SKIP [file rootname [file tail $t]]: needs VX_USB (run toolkit/scripts/selftest-build.sh, then VX_USB=<usb-dir>)"
+        } else {
+            lappend kept $t
+        }
+    }
+    set test_scripts $kept
+}
 puts "\nExecuting: $test_scripts"
 
 # Set timeout for Expect commands (in seconds). raspi4 is fully emulated (TCG,

@@ -320,12 +320,13 @@ esac
 say "6) stage merged install/ -> USB dir $USB_DIR (-> /bd0a; ros2.img untouched)"
 cp -a "$INSTALL/." "$USB_DIR/" || die "staging merged install/ to USB failed"
 
-# Map lang -> on-target test proc.
-test_for() { case "$1" in
-  cpp)    echo test09-toolkit-cpp-hello ;;
-  rust)   echo test10-toolkit-rust-hello ;;
-  python) echo test11-toolkit-python-hello ;;
-esac; }
+# Map lang -> on-target test proc by naming (tests/test*-toolkit-<lang>-*.exp), the
+# same convention tests/main_script.exp uses to skip toolkit tests without VX_USB.
+test_for() {
+  local t; t="$(ls "$BUILD_TREE"/tests/test*-toolkit-"$1"-*.exp 2>/dev/null | head -1)"
+  [ -n "$t" ] || die "no on-target test tests/test*-toolkit-$1-*.exp for --lang $1"
+  basename "$t" .exp
+}
 
 # Print the copy-pasteable on-target command. The harness attaches the USB dir via
 # VX_USB (-> /bd0a); ros2.img is booted read-only/unmodified.

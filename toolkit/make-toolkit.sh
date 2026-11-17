@@ -105,14 +105,26 @@ fi
 # --- 2) sdk_overlay.json inventory ------------------------------------------
 log "2) sdk_overlay.json"
 ( cd "$OV" && find . -type f -o -type l ) | sed 's#^\./##' | LC_ALL=C sort > "$STAGE/.ovlist"
-python3 - "$STAGE/.ovlist" "$STAGE/sdk_overlay.json" <<'PY'
+# SDK files the build moved out of the way (pkg/sdk sdk_fix -> 3pp/.removed/<tree>/,
+# e.g. the SDK sqlite/libyaml that ROS 2 builds as vendors). Mirrored from what
+# the build actually moved, so the list cannot drift from defs.sdk.mk.
+RM_ROOT="$WIND_CC_SYSROOT/usr/3pp/.removed"
+: > "$STAGE/.rmlist"
+if [ -d "$RM_ROOT" ]; then
+  ( cd "$RM_ROOT" && find . -mindepth 2 \( -type f -o -type l \) ) | sed 's#^\./##' \
+    | sed "s#^#$SYSROOT_REL/usr/3pp/#" | LC_ALL=C sort > "$STAGE/.rmlist"
+fi
+python3 - "$STAGE/.ovlist" "$STAGE/sdk_overlay.json" "$STAGE/.rmlist" <<'PY'
 import json, sys
 files = [l.strip() for l in open(sys.argv[1]) if l.strip()]
+removed = [l.strip() for l in open(sys.argv[3]) if l.strip()]
 doc = {
   "description": "Files copied verbatim into the vanilla VxWorks SDK by "
-                 "scripts/ros2sdk-prepare.sh (cp -a sdk_overlay/. $WRSDK/). "
+                 "scripts/ros2sdk-prepare.sh (cp -a sdk_overlay/. $WRSDK/), and SDK "
+                 "files it moves aside (removed: <3pp>/<tree>/X -> <3pp>/.removed/<tree>/X). "
                  "Paths relative to SDK root.",
   "files": files,
+  "removed": removed,
   "pip_requirements": "requirements.txt",
   "crossenv": {"regenerate": True,
                "path": "vxsdk/host/x86_64-linux/cross_venv/cross"},
@@ -120,7 +132,7 @@ doc = {
 json.dump(doc, open(sys.argv[2], "w"), indent=2)
 open(sys.argv[2], "a").write("\n")
 PY
-rm -f "$STAGE/.ovlist"
+rm -f "$STAGE/.ovlist" "$STAGE/.rmlist"
 
 # --- 3) requirements.txt (host pip tools) -----------------------------------
 log "3) requirements.txt"
