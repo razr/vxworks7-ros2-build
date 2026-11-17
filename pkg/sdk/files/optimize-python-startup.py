@@ -1,31 +1,32 @@
 #!/usr/bin/env python3
-# optimize-python-startup - make a Python install/deploy tree start fast on the
-# VxWorks target: precompile unchecked-hash .pyc and replace the setuptools
-# EASY-INSTALL launchers with importlib.metadata ones. A generic host tool,
-# installed by pkg/sdk into the SDK host bin (on PATH after sdkenv.sh). Used by
-# the image build (python_prepare_deploy in mk/usr/defs.python.mk), the toolkit
-# self-test, and users on their own colcon install/ tree.
+# optimize-python-startup - make a deployed Python tree start fast on a
+# VxWorks target.
 #
-# Why: on the target every file stat/open goes to a FAT image (over emulated
-# AHCI under QEMU TCG), so Python startup cost grows with the number of files
-# it touches. Two things in a default install touch many files:
-#   1. the setuptools EASY-INSTALL console-script launchers call
+# Usage: optimize-python-startup [--no-compile] <root>
+#
+# <root> is the tree that is copied to the target (e.g. an install prefix with
+# bin/, lib/ and lib/pythonX.Y/site-packages). Run it on the host with the
+# SDK's python3, which has the same major.minor as the target Python.
+#
+# Why: on a VxWorks target the file system is often slow (e.g. FAT on a disk
+# image), so Python startup time grows with the number of files it touches.
+# Two things in a default setuptools install touch many files:
+#   1. EASY-INSTALL console-script launchers call
 #      pkg_resources.load_entry_point, and importing pkg_resources scans every
-#      *.dist-info/*.egg-info first (measured ~238 s on QEMU);
+#      *.dist-info/*.egg-info on sys.path first (minutes on a slow FS);
 #   2. without shipped .pyc, every module is compiled on first import.
 #
 # What it does, for <root>:
-#   a. removes every __pycache__ (build-time caches may be host-arch or
-#      timestamp-checked, and would be stale after the copy to the target);
-#   b. compiles all .py with unchecked-hash .pyc, so the target loads the
-#      bytecode as-is and never revalidates or recompiles it. Must run with the
-#      same Python major.minor as the target (the SDK host python3);
-#   c. rewrites the EASY-INSTALL launchers in <root>/bin and in every
-#      <root>/lib/<pkg>/ (where ament_python puts node executables) into
-#      importlib.metadata wrappers that resolve the same single entry point.
+#   a. removes every __pycache__ (host-built caches may be for another Python
+#      version, or timestamp-checked and stale once the files are copied);
+#   b. compiles all .py to unchecked-hash .pyc, which the target loads as-is
+#      without revalidating or recompiling (--no-compile skips a and b);
+#   c. rewrites the EASY-INSTALL launchers directly in <root>/bin and in every
+#      <root>/lib/*/ into importlib.metadata wrappers that resolve the same
+#      single entry point. Other files are left untouched.
 #
-# Idempotent. Best-effort: compile errors are reported but do not fail.
-# Usage: optimize-python-startup [--no-compile] <root>
+# Idempotent. Best-effort: a file that fails to compile is reported, not fatal.
+# Exit status: 0 on success, 2 on bad arguments.
 
 import compileall
 import os
@@ -91,7 +92,7 @@ def convert_dir(bin_dir):
 
 
 def launcher_dirs(root):
-    """<root>/bin plus every <root>/lib/<pkg>/ directory."""
+    """<root>/bin plus every <root>/lib/*/ directory."""
     dirs = []
     b = os.path.join(root, 'bin')
     if os.path.isdir(b):
