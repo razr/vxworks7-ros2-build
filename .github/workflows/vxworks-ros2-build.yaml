@@ -27,9 +27,6 @@ on:
         required: false
         type: boolean
         default: false
-      layer_url:
-        type: string
-        default: ""
       debug:
         required: false
         type: boolean
@@ -59,10 +56,6 @@ on:
         required: false
         default: false
         type: boolean
-      layer_url:
-        description: "vxworks7-layer-for-ros2 URL (empty = Makefile default)"
-        type: string
-        default: ""
       debug:
         description: "Debug"
         required: false
@@ -197,7 +190,7 @@ jobs:
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs -C /work ${{ inputs.layer_url && format('PKG_LAYER_URL={0} TOOLKIT_LAYER_URL={0}', inputs.layer_url) || '' }}'
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs -C /work'
 
       - name: Create an SROS2 script
         run: |
@@ -262,7 +255,7 @@ jobs:
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make toolkit -C /work ${{ inputs.layer_url && format('PKG_LAYER_URL={0} TOOLKIT_LAYER_URL={0}', inputs.layer_url) || '' }}'
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make toolkit -C /work'
 
       - name: Upload the ROS 2 SDK toolkit
         if: ${{ inputs.toolkit }}
