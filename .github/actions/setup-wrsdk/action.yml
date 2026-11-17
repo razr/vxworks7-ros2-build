@@ -44,6 +44,7 @@ runs:
     - name: Calculate SDK URL
       id: calculate-url
       run: |
+        mkdir -p ${{ inputs.directory }}
         cd $GITHUB_ACTION_PATH
         python ./parse_wrsdks.py ${{ inputs.sdks_list }} ${{ inputs.sdk }} ${{ inputs.vxworks }} > ${{ inputs.directory }}/sdk-url.txt
         cd ${{ inputs.directory }}

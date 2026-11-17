@@ -9,6 +9,8 @@ runs:
   steps:
     - name: Install QEMU and expect
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
         sudo apt-get update
         # x86_64 (distro) + aarch64. For aarch64 we use the PATCHED qemu from
@@ -22,12 +24,14 @@ runs:
         # architecture (amd64 on ubuntu-24.04, arm64 on ubuntu-24.04-arm)
         release=v11.0.90-raspi4genet3
         arch=$(dpkg --print-architecture)
-        deb_url=$(curl -fsSL "https://api.github.com/repos/razr/qemu-raspi4-deb/releases/tags/$release" \
-          | grep -oE "https://[^\"]*/qemu-raspi4_[^\"]*_${arch}\.deb" | head -1)
-        [ -n "$deb_url" ] || { echo "no qemu-raspi4 .deb for $arch in release $release"; exit 1; }
-        echo "qemu-raspi4 deb: $deb_url"
-        curl -fL -o /tmp/qemu-raspi4.deb "$deb_url"
-        sudo apt-get install -y /tmp/qemu-raspi4.deb
+        # authenticated download (gh + the job token): the anonymous GitHub API
+        # rate limit on shared runners returns 403
+        rm -rf /tmp/qemu-raspi4 && mkdir -p /tmp/qemu-raspi4
+        gh release download "$release" -R razr/qemu-raspi4-deb -p "*_${arch}.deb" -D /tmp/qemu-raspi4
+        deb="$(ls /tmp/qemu-raspi4/*_${arch}.deb 2>/dev/null | head -1)"
+        [ -n "$deb" ] || { echo "no qemu-raspi4 .deb for $arch in release $release"; exit 1; }
+        echo "qemu-raspi4 deb: $deb"
+        sudo apt-get install -y "$deb"
         sudo ln -sf /usr/bin/qemu-system-aarch64-raspi4 /usr/local/bin/qemu-system-aarch64
         qemu-system-aarch64 --version | head -1
 
