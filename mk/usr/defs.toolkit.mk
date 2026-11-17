@@ -24,8 +24,8 @@ TOOLKIT_TARBALL ?= $(TOP_BUILDDIR)/$(TOOLKIT_NAME).tar.zst
 TOOLKIT_ASSEMBLE?= $(TOOLKIT_SRC_DIR)/make-toolkit.sh
 
 # SDK overlay: the delta that turns a vanilla SDK into the one this build used.
-# A build output of `make fs` (like export/root and ros2.img); `make toolkit`
-# only packs it, so it needs no patched SDK.
+# A build output of `make sdk-overlay` (like export/root and ros2.img); `make
+# toolkit` only packs it, so it needs no patched SDK.
 SDK_OVERLAY_DIR  ?= $(TOP_BUILDDIR)/sdk_overlay
 SDK_OVERLAY_JSON ?= $(TOP_BUILDDIR)/sdk_overlay.json
 SDK_OVERLAY_GEN  ?= $(TOOLKIT_SRC_DIR)/make-sdk-overlay.sh
@@ -52,7 +52,7 @@ TOOLKIT_LAYER_COMMIT    ?=
 .PHONY: toolkit-clean toolkit-info
 
 # build_sdk_overlay - generate $(SDK_OVERLAY_DIR) + $(SDK_OVERLAY_JSON) from the
-# build inputs and the patched SDK. No args. Called by `make fs`.
+# build inputs and the patched SDK. No args. Called by `make sdk-overlay`.
 define build_sdk_overlay
 	TOP_BUILDDIR="$(TOP_BUILDDIR)" PACKAGE_DIR="$(PACKAGE_DIR)" \
 	BUILDSPECS_DIR="$(BUILDSPECS_DIR)" WIND_CC_SYSROOT="$(WIND_CC_SYSROOT)" \

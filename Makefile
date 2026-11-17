@@ -37,14 +37,12 @@ endif
 all: $(DOWNLOADS_DIR) $(STAMP_DIR) $(EXPORT_DIR)
 	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.install || exit 1; done;
 
-# fs - lay out export/deploy from the built packages (defs.fs.mk::fs_deploy) and
-# generate the SDK overlay.
+# fs - lay out export/deploy from the built packages (defs.fs.mk::fs_deploy).
 fs: all
 	$(call fs_deploy)
-	$(call build_sdk_overlay)
 
 # sdk-overlay - generate output/sdk_overlay/ + sdk_overlay.json, the SDK delta
-# (defs.toolkit.mk::build_sdk_overlay). Also run by fs.
+# (defs.toolkit.mk::build_sdk_overlay).
 sdk-overlay: all
 	$(call build_sdk_overlay)
 

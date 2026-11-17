@@ -190,7 +190,7 @@ jobs:
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs -C /work'
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs sdk-overlay -C /work'
 
       - name: Create an SROS2 script
         run: |

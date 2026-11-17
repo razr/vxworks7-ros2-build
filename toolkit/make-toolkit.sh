@@ -10,7 +10,7 @@
 # It reads no SDK files: everything SDK-specific comes from the SDK overlay.
 #
 # It stages a self-contained toolkit:
-#   sdk_overlay/      - the SDK delta (a build output of 'make fs',
+#   sdk_overlay/      - the SDK delta (a build output of 'make sdk-overlay',
 #   sdk_overlay.json    toolkit/make-sdk-overlay.sh) and its inventory
 #   requirements.txt  - host pip tools (colcon/ros2cli/crossenv/...)
 #   export/root       - the prebuilt ROS 2 SDK (build apps against this)
@@ -36,10 +36,10 @@ OV="$STAGE/sdk_overlay"
 log "staging at $STAGE"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 
-# --- 1) sdk_overlay/ + sdk_overlay.json (a build output: make fs) ----------
+# --- 1) sdk_overlay/ + sdk_overlay.json (a build output: make sdk-overlay) ----------
 log "1) sdk_overlay/ + sdk_overlay.json (copying the build's SDK overlay)"
-[ -d "$SDK_OVERLAY_DIR" ]  || die "SDK overlay missing ($SDK_OVERLAY_DIR) - run 'make fs'"
-[ -f "$SDK_OVERLAY_JSON" ] || die "SDK overlay inventory missing ($SDK_OVERLAY_JSON) - run 'make fs'"
+[ -d "$SDK_OVERLAY_DIR" ]  || die "SDK overlay missing ($SDK_OVERLAY_DIR) - run 'make sdk-overlay'"
+[ -f "$SDK_OVERLAY_JSON" ] || die "SDK overlay inventory missing ($SDK_OVERLAY_JSON) - run 'make sdk-overlay'"
 cp -a "$SDK_OVERLAY_DIR" "$OV"
 install -m0644 "$SDK_OVERLAY_JSON" "$STAGE/sdk_overlay.json"
 

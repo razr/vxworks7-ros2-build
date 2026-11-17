@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # make-sdk-overlay.sh - generate the SDK overlay: the delta that turns a vanilla
-# VxWorks SDK into the SDK this build used. Invoked by `make fs`
+# VxWorks SDK into the SDK this build used. Invoked by `make sdk-overlay`
 # (mk/usr/defs.toolkit.mk::build_sdk_overlay) with these vars in the environment:
 #
 #   TOP_BUILDDIR PACKAGE_DIR BUILDSPECS_DIR WIND_CC_SYSROOT WIND_SDK_HOME
@@ -15,7 +15,7 @@ set -euo pipefail
 
 log()  { printf '  sdk-overlay: %s\n' "$*"; }
 die()  { printf 'sdk-overlay FAILED: %s\n' "$*" >&2; exit 1; }
-need() { [ -n "${!1:-}" ] || die "env var $1 is required (run via 'make fs')"; }
+need() { [ -n "${!1:-}" ] || die "env var $1 is required (run via 'make sdk-overlay')"; }
 
 for v in TOP_BUILDDIR PACKAGE_DIR BUILDSPECS_DIR WIND_CC_SYSROOT WIND_SDK_HOME \
          SDK_OVERLAY_DIR SDK_OVERLAY_JSON; do need "$v"; done
