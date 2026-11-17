@@ -247,22 +247,25 @@ jobs:
             ${{ github.workspace }}/*xWorks*
             ${{ github.workspace }}/*.dtb
 
-      - name: Assemble the ROS 2 SDK toolkit
-        if: ${{ inputs.toolkit }}
+      - name: Pack the ROS 2 SDK (export/root) and the SDK overlay
         run: |
-          docker run --rm \
-            -e UID=$(id -u) -e GID=$(id -g) \
-            -v /tmp/wrsdk:/wrsdk \
-            -v ${{ github.workspace }}:/work \
-            vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make toolkit -C /work'
+          # tar, because upload-artifact does not keep symlinks (.so chains).
+          cd ${{ github.workspace }}/output
+          tar --zstd -cf ros2-sdk.tar.zst export/root
+          tar -cf sdk-overlay.tar sdk_overlay sdk_overlay.json
+          ls -l ros2-sdk.tar.zst sdk-overlay.tar
 
-      - name: Upload the ROS 2 SDK toolkit
-        if: ${{ inputs.toolkit }}
+      - name: Upload the ROS 2 SDK (export/root)
         uses: actions/upload-artifact@v4
         with:
-          name: ros2-vxworks-toolkit ${{ env.sdk }} ${{ env.ros_distro }}
-          path: ${{ github.workspace }}/output/ros2-vxworks-*.tar.*
+          name: ROS 2 SDK ${{ env.sdk }} ${{ env.ros_distro }}
+          path: ${{ github.workspace }}/output/ros2-sdk.tar.zst
+
+      - name: Upload the SDK overlay
+        uses: actions/upload-artifact@v4
+        with:
+          name: SDK overlay ${{ env.sdk }} ${{ env.ros_distro }}
+          path: ${{ github.workspace }}/output/sdk-overlay.tar
 
       - name: Setup upterm session
         if: ${{ always() && inputs.debug }}
@@ -276,10 +279,66 @@ jobs:
           echo "sdk=${{ env.sdk }}" >> $GITHUB_OUTPUT
           echo "ros_distro=${{ env.ros_distro }}" >> $GITHUB_OUTPUT
 
-  test:
+  toolkit:
     runs-on: ubuntu-24.04
     needs: build
-    if: ${{ inputs.test }}
+    if: ${{ inputs.toolkit }}
+    env:
+      ROS_DISTRO: ${{ needs.build.outputs.ros_distro }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      # Only for make's SDK variables (release id, arch, SDK name): make toolkit
+      # reads no SDK files, everything SDK-specific comes from the SDK overlay.
+      - name: Get the VxWorks SDK
+        uses: ./.github/actions/setup-wrsdk
+        with:
+          sdks_list: wrsdks.json
+          sdk: ${{ needs.build.outputs.sdk }}
+          vxworks: ${{ inputs.vxworks }}
+          directory: /tmp/vanilla
+          sdkenv: true
+
+      - name: Download the HDD image
+        uses: actions/download-artifact@v4
+        with:
+          name: HDD image ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+
+      - name: Download the ROS 2 SDK (export/root)
+        uses: actions/download-artifact@v4
+        with:
+          name: ROS 2 SDK ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+          path: ${{ github.workspace }}/output
+
+      - name: Download the SDK overlay
+        uses: actions/download-artifact@v4
+        with:
+          name: SDK overlay ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+          path: ${{ github.workspace }}/output
+
+      - name: Assemble the ROS 2 SDK toolkit
+        run: |
+          cd ${{ github.workspace }}/output
+          tar --zstd -xf ros2-sdk.tar.zst && rm ros2-sdk.tar.zst
+          tar -xf sdk-overlay.tar && rm sdk-overlay.tar
+          ls -ld export/root sdk_overlay sdk_overlay.json ros2.img
+          cd ${{ github.workspace }} && make toolkit
+
+      - name: Upload the ROS 2 SDK toolkit
+        uses: actions/upload-artifact@v4
+        with:
+          name: ros2-vxworks-toolkit ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
+          path: ${{ github.workspace }}/output/ros2-vxworks-*.tar.*
+
+  test:
+    runs-on: ubuntu-24.04
+    needs: [build, toolkit]
+    # Run when the build succeeded and the toolkit job succeeded or was skipped
+    # (toolkit off): a plain needs: would skip the tests with the toolkit.
+    if: ${{ always() && inputs.test && needs.build.result == 'success' && contains(fromJSON('["success","skipped"]'), needs.toolkit.result) }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4

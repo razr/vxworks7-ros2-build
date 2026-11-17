@@ -4,14 +4,14 @@
 # the environment:
 #
 #   TOP_BUILDDIR EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR
-#   ROS_DISTRO WIND_RELEASE_ID TGT_ARCH WIND_CC_SYSROOT WIND_SDK_HOME
-#   TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL
+#   ROS_DISTRO WIND_RELEASE_ID TGT_ARCH WIND_SDK_HOME
+#   SDK_OVERLAY_DIR SDK_OVERLAY_JSON TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL
+#
+# It reads no SDK files: everything SDK-specific comes from the SDK overlay.
 #
 # It stages a self-contained toolkit:
-#   sdk_overlay/      - the SDK delta, generated from the build inputs
-#                       (buildspecs/cmake, pkg/sdk/files, built unixextra, the
-#                       patched SDK's host bin + rust) - NOT from a diff.
-#   sdk_overlay.json  - inventory of the overlay
+#   sdk_overlay/      - the SDK delta (a build output of 'make fs',
+#   sdk_overlay.json    toolkit/make-sdk-overlay.sh) and its inventory
 #   requirements.txt  - host pip tools (colcon/ros2cli/crossenv/...)
 #   export/root       - the prebuilt ROS 2 SDK (build apps against this)
 #   ros2.img          - bootable VxWorks target image (CONTAINS the target rootfs
@@ -26,132 +26,41 @@ die()  { printf 'toolkit FAILED: %s\n' "$*" >&2; exit 1; }
 need() { [ -n "${!1:-}" ] || die "env var $1 is required (run via 'make toolkit')"; }
 
 for v in TOP_BUILDDIR EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR \
-         ROS_DISTRO WIND_CC_SYSROOT WIND_SDK_HOME TOOLKIT_SRC_DIR TOOLKIT_STAGE \
-         TOOLKIT_TARBALL; do need "$v"; done
+         ROS_DISTRO WIND_SDK_HOME SDK_OVERLAY_DIR SDK_OVERLAY_JSON \
+         TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL; do need "$v"; done
 
 STAGE="$TOOLKIT_STAGE"
 OV="$STAGE/sdk_overlay"
-HOSTBIN_REL="vxsdk/host/x86_64-linux/bin"
-SYSROOT_REL="vxsdk/sysroot"
-UNIXEXTRA_SRC="$TOP_BUILDDIR/build/unixextra/src"
-SDK_HOSTBIN="$WIND_SDK_HOME/$HOSTBIN_REL"
 
 # ---------------------------------------------------------------------------
 log "staging at $STAGE"
 rm -rf "$STAGE"; mkdir -p "$STAGE"
 
-# --- 1) sdk_overlay/ from the build inputs ----------------------------------
-log "1) building sdk_overlay/"
+# --- 1) sdk_overlay/ + sdk_overlay.json (a build output: make fs) ----------
+log "1) sdk_overlay/ + sdk_overlay.json (copying the build's SDK overlay)"
+[ -d "$SDK_OVERLAY_DIR" ]  || die "SDK overlay missing ($SDK_OVERLAY_DIR) - run 'make fs'"
+[ -f "$SDK_OVERLAY_JSON" ] || die "SDK overlay inventory missing ($SDK_OVERLAY_JSON) - run 'make fs'"
+cp -a "$SDK_OVERLAY_DIR" "$OV"
+install -m0644 "$SDK_OVERLAY_JSON" "$STAGE/sdk_overlay.json"
 
-# 1a) cmake toolchain + Platform  <- buildspecs/cmake (repo)
-install -D -m0644 "$BUILDSPECS_DIR/cmake/toolchain.cmake"        "$OV/$SYSROOT_REL/mk/toolchain.cmake"
-install -D -m0644 "$BUILDSPECS_DIR/cmake/Platform/VxWorks.cmake" "$OV/$SYSROOT_REL/mk/Platform/VxWorks.cmake"
-
-# 1b) defs.autotools.mk  <- pkg/sdk/files (repo)
-install -D -m0644 "$PACKAGE_DIR/sdk/files/defs.autotools.mk"     "$OV/$SYSROOT_REL/mk/defs.autotools.mk"
-
-# 1c) unixextra lib + the EXACTLY 7 headers it installs  <- built unixextra src
-[ -d "$UNIXEXTRA_SRC" ] || die "unixextra build dir missing: $UNIXEXTRA_SRC (run 'make' first)"
-install -D -m0644 "$UNIXEXTRA_SRC/libunixextra.a"    "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.a"
-install -D -m0755 "$UNIXEXTRA_SRC/libunixextra.so.1" "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.so.1"
-ln -sf libunixextra.so.1 "$OV/$SYSROOT_REL/usr/lib/common/libunixextra.so"
-UX_H="$OV/$SYSROOT_REL/usr/h/published/UTILS_UNIX"
-# Overlay ONLY the UTILS_UNIX headers unixextra ACTUALLY installed into the SDK
-# sysroot -- do NOT hardcode the list from $UNIXEXTRA_SRC. unixextra's install is
-# version-aware (pkg/unixextra/Makefile: for WIND_RELEASE_ID major > 23 it drops
-# pthread_getname.c from SOURCES, so pthread.h is NOT installed because VxWorks
-# libc already provides pthread_getname_np/pthread_setname_np). Copying a fixed
-# list from the source tree re-introduced a stale pthread.h whose const-char*
-# signature conflicts with libc/public pthread.h and breaks find_package(Threads)
-# (e.g. libxml2_vendor). Mirroring the installed set keeps the toolkit in lockstep
-# with unixextra's own version logic -- no duplicated MAJOR_VERSION check to drift.
-UX_SYSROOT_H="$WIND_CC_SYSROOT/usr/h/published/UTILS_UNIX"
-[ -d "$UX_SYSROOT_H" ] || die "unixextra headers not installed in sysroot: $UX_SYSROOT_H (run 'make unixextra' first)"
-( cd "$UX_SYSROOT_H" && find . -name '*.h' -print ) | while IFS= read -r rel; do
-  install -D -m0644 "$UX_SYSROOT_H/$rel" "$UX_H/$rel"
-done
-
-# 1d) cc-conf/default.conf (carries the -lunixextra link edit)  <- patched SDK
-grep -q 'lunixextra' "$WIND_CC_SYSROOT/cc-conf/default.conf" \
-  || die "patched SDK default.conf has no -lunixextra (is the SDK patched? run 'make sdk')"
-install -D -m0644 "$WIND_CC_SYSROOT/cc-conf/default.conf" "$OV/$SYSROOT_REL/cc-conf/default.conf"
-
-# 1e) host bin: pip/python launchers + symlinks + cargo-ament-build +
-#     optimize-python-startup  <- patched SDK
-install -D -m0755 "$SDK_HOSTBIN/pip3.9"           "$OV/$HOSTBIN_REL/pip3.9"
-install -D -m0755 "$SDK_HOSTBIN/cargo-ament-build" "$OV/$HOSTBIN_REL/cargo-ament-build"
-install -D -m0755 "$SDK_HOSTBIN/optimize-python-startup" "$OV/$HOSTBIN_REL/optimize-python-startup"
-ln -sf pip3.9    "$OV/$HOSTBIN_REL/pip"
-ln -sf pip3.9    "$OV/$HOSTBIN_REL/pip3"
-ln -sf python3.9 "$OV/$HOSTBIN_REL/python"
-ln -sf python3.9 "$OV/$HOSTBIN_REL/python3"
-
-# 1f) rust fixups: .cargo/config.toml + patched libloading  <- patched SDK
-RUST_SRC="$WIND_CC_SYSROOT/usr/rust"
-if [ -f "$RUST_SRC/.cargo/config.toml" ]; then
-  install -D -m0644 "$RUST_SRC/.cargo/config.toml" "$OV/$SYSROOT_REL/usr/rust/.cargo/config.toml"
-  if [ -d "$RUST_SRC/vxworks-crates/libloading" ]; then
-    LL_DST="$OV/$SYSROOT_REL/usr/rust/vxworks-crates/libloading"
-    mkdir -p "$LL_DST/src"
-    cp -a "$RUST_SRC/vxworks-crates/libloading/src/." "$LL_DST/src/"
-    for f in Cargo.toml Cargo.lock LICENSE; do
-      [ -f "$RUST_SRC/vxworks-crates/libloading/$f" ] && cp -a "$RUST_SRC/vxworks-crates/libloading/$f" "$LL_DST/$f"
-    done
-  fi
-else
-  log "   (no rust fixups in SDK - skipping; toolkit without Rust)"
-fi
-
-# --- 2) sdk_overlay.json inventory ------------------------------------------
-log "2) sdk_overlay.json"
-( cd "$OV" && find . -type f -o -type l ) | sed 's#^\./##' | LC_ALL=C sort > "$STAGE/.ovlist"
-# SDK files the build moved out of the way (pkg/sdk sdk_fix -> 3pp/.removed/<tree>/,
-# e.g. the SDK sqlite/libyaml that ROS 2 builds as vendors). Mirrored from what
-# the build actually moved, so the list cannot drift from defs.sdk.mk.
-RM_ROOT="$WIND_CC_SYSROOT/usr/3pp/.removed"
-: > "$STAGE/.rmlist"
-if [ -d "$RM_ROOT" ]; then
-  ( cd "$RM_ROOT" && find . -mindepth 2 \( -type f -o -type l \) ) | sed 's#^\./##' \
-    | sed "s#^#$SYSROOT_REL/usr/3pp/#" | LC_ALL=C sort > "$STAGE/.rmlist"
-fi
-python3 - "$STAGE/.ovlist" "$STAGE/sdk_overlay.json" "$STAGE/.rmlist" <<'PY'
-import json, sys
-files = [l.strip() for l in open(sys.argv[1]) if l.strip()]
-removed = [l.strip() for l in open(sys.argv[3]) if l.strip()]
-doc = {
-  "description": "Files copied verbatim into the vanilla VxWorks SDK by "
-                 "scripts/ros2sdk-prepare.sh (cp -a sdk_overlay/. $WRSDK/), and SDK "
-                 "files it moves aside (removed: <3pp>/<tree>/X -> <3pp>/.removed/<tree>/X). "
-                 "Paths relative to SDK root.",
-  "files": files,
-  "removed": removed,
-  "pip_requirements": "requirements.txt",
-  "crossenv": {"regenerate": True,
-               "path": "vxsdk/host/x86_64-linux/cross_venv/cross"},
-}
-json.dump(doc, open(sys.argv[2], "w"), indent=2)
-open(sys.argv[2], "a").write("\n")
-PY
-rm -f "$STAGE/.ovlist" "$STAGE/.rmlist"
-
-# --- 3) requirements.txt (host pip tools) -----------------------------------
-log "3) requirements.txt"
+# --- 2) requirements.txt (host pip tools) -----------------------------------
+log "2) requirements.txt"
 install -m0644 "$TOOLKIT_SRC_DIR/requirements.txt" "$STAGE/requirements.txt"
 
-# --- 4) the ROS 2 SDK: export/root + ros2.img ------------------------------
+# --- 3) the ROS 2 SDK: export/root + ros2.img ------------------------------
 # NOTE: export/deploy is deliberately NOT shipped separately -- it is already
 # inside ros2.img (make image packs it there). Shipping it loose would duplicate
 # the whole target rootfs. extract-deploy.sh can recover it from ros2.img if a
 # user ever needs the loose tree.
-log "4) export/root + ros2.img (copying built artifacts)"
+log "3) export/root + ros2.img (copying built artifacts)"
 [ -d "$ROOT_DIR" ]              || die "export/root missing ($ROOT_DIR) - run 'make'"
 [ -f "$TOP_BUILDDIR/ros2.img" ] || die "ros2.img missing - run 'make image'"
 mkdir -p "$STAGE/export"
 cp -a "$ROOT_DIR"   "$STAGE/export/root"
 cp -a "$TOP_BUILDDIR/ros2.img" "$STAGE/ros2.img"
 
-# --- 5) committed tooling (scripts, shims, devcontainer, vscode, README) ----
-log "5) scripts/ host-shims/ .devcontainer/ .vscode/ README.md"
+# --- 4) committed tooling (scripts, shims, devcontainer, vscode, README) ----
+log "4) scripts/ host-shims/ .devcontainer/ .vscode/ README.md"
 cp -a "$TOOLKIT_SRC_DIR/scripts"       "$STAGE/scripts"
 cp -a "$TOOLKIT_SRC_DIR/host-shims"    "$STAGE/host-shims"
 cp -a "$TOOLKIT_SRC_DIR/.devcontainer" "$STAGE/.devcontainer"
@@ -168,8 +77,8 @@ if [ -f "$RUST_TMPL" ]; then
   log "   staged rust-cargo-config.toml.template (Rust/rclrs support)"
 fi
 
-# --- 6) manifest.json (keys == Makefile vars) + layer pin + build commit ----
-log "6) manifest.json"
+# --- 5) manifest.json (keys == Makefile vars) + layer pin + build commit ----
+log "5) manifest.json"
 PKGMK="$PACKAGE_DIR/ros2/files/$ROS_DISTRO/packages.mk"
 GENMANIFEST="$TOOLKIT_SRC_DIR/scripts/generate-manifest.py"
 # build-repo provenance: the vxworks7-ros2-build commit + describe that produced
@@ -200,8 +109,8 @@ else
   log "   WARN: no packages.mk or generate-manifest.py - skipping manifest"
 fi
 
-# --- 7) RELEASE_NOTES.md (identity from manifest + curated caveats) ---------
-log "7) RELEASE_NOTES.md"
+# --- 6) RELEASE_NOTES.md (identity from manifest + curated caveats) ---------
+log "6) RELEASE_NOTES.md"
 NOTES_IN="$TOOLKIT_SRC_DIR/RELEASE_NOTES.in.md"
 GENNOTES="$TOOLKIT_SRC_DIR/scripts/gen-release-notes.py"
 if [ -f "$STAGE/manifest.json" ] && [ -f "$GENNOTES" ]; then
@@ -212,8 +121,8 @@ else
   log "   WARN: no manifest.json or gen-release-notes.py - skipping RELEASE_NOTES.md"
 fi
 
-# --- 8) tar it --------------------------------------------------------------
-log "8) packaging -> $TOOLKIT_TARBALL"
+# --- 7) tar it --------------------------------------------------------------
+log "7) packaging -> $TOOLKIT_TARBALL"
 STAGE_PARENT="$(dirname "$STAGE")"
 STAGE_BASE="$(basename "$STAGE")"
 if command -v zstd >/dev/null 2>&1 && [[ "$TOOLKIT_TARBALL" == *.zst ]]; then

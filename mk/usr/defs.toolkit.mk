@@ -23,6 +23,13 @@ TOOLKIT_STAGE   ?= $(TOOLKIT_BUILD)/$(TOOLKIT_NAME)
 TOOLKIT_TARBALL ?= $(TOP_BUILDDIR)/$(TOOLKIT_NAME).tar.zst
 TOOLKIT_ASSEMBLE?= $(TOOLKIT_SRC_DIR)/make-toolkit.sh
 
+# SDK overlay: the delta that turns a vanilla SDK into the one this build used.
+# A build output of `make fs` (like export/root and ros2.img); `make toolkit`
+# only packs it, so it needs no patched SDK.
+SDK_OVERLAY_DIR  ?= $(TOP_BUILDDIR)/sdk_overlay
+SDK_OVERLAY_JSON ?= $(TOP_BUILDDIR)/sdk_overlay.json
+SDK_OVERLAY_GEN  ?= $(TOOLKIT_SRC_DIR)/make-sdk-overlay.sh
+
 # Compression: zstd if present, else gzip (.tar.gz).
 TOOLKIT_ZSTD    := $(shell command -v zstd 2>/dev/null)
 
@@ -33,7 +40,7 @@ TOOLKIT_LAYER_COMMIT_ID ?= $(ROS_DISTRO)-release-$(WIND_RELEASE_ID)
 TOOLKIT_LAYER_COMMIT    ?=
 
 # --- the target -------------------------------------------------------------
-# toolkit CONSUMES the already-built artifacts (export/root, export/deploy and
+# toolkit CONSUMES the already-built artifacts (export/root, the SDK overlay and
 # ros2.img); building them is NOT its job. It is intentionally decoupled from
 # the `image`/`fs` targets so the caller (CI, or a local `make image && make
 # toolkit`) owns producing ros2.img. toolkit/make-toolkit.sh verifies ros2.img
@@ -44,6 +51,16 @@ TOOLKIT_LAYER_COMMIT    ?=
 # build_toolkit macro below; toolkit-clean / toolkit-info stay here with the vars.
 .PHONY: toolkit-clean toolkit-info
 
+# build_sdk_overlay - generate $(SDK_OVERLAY_DIR) + $(SDK_OVERLAY_JSON) from the
+# build inputs and the patched SDK. No args. Called by `make fs`.
+define build_sdk_overlay
+	TOP_BUILDDIR="$(TOP_BUILDDIR)" PACKAGE_DIR="$(PACKAGE_DIR)" \
+	BUILDSPECS_DIR="$(BUILDSPECS_DIR)" WIND_CC_SYSROOT="$(WIND_CC_SYSROOT)" \
+	WIND_SDK_HOME="$(WIND_SDK_HOME)" \
+	SDK_OVERLAY_DIR="$(SDK_OVERLAY_DIR)" SDK_OVERLAY_JSON="$(SDK_OVERLAY_JSON)" \
+	    bash "$(SDK_OVERLAY_GEN)"
+endef
+
 # build_toolkit - run the kit assembler (make-toolkit.sh) with the build vars in
 # its environment. No args. Consumes export/root, export/deploy, ros2.img.
 define build_toolkit
@@ -52,8 +69,8 @@ define build_toolkit
 	EXPORT_DIR="$(EXPORT_DIR)" ROOT_DIR="$(ROOT_DIR)" DEPLOY_DIR="$(DEPLOY_DIR)" \
 	PACKAGE_DIR="$(PACKAGE_DIR)" BUILDSPECS_DIR="$(BUILDSPECS_DIR)" \
 	ROS_DISTRO="$(ROS_DISTRO)" WIND_RELEASE_ID="$(WIND_RELEASE_ID)" \
-	TGT_ARCH="$(TGT_ARCH)" WIND_CC_SYSROOT="$(WIND_CC_SYSROOT)" \
-	WIND_SDK_HOME="$(WIND_SDK_HOME)" \
+	TGT_ARCH="$(TGT_ARCH)" WIND_SDK_HOME="$(WIND_SDK_HOME)" \
+	SDK_OVERLAY_DIR="$(SDK_OVERLAY_DIR)" SDK_OVERLAY_JSON="$(SDK_OVERLAY_JSON)" \
 	PKG_LAYER_URL="$(TOOLKIT_LAYER_URL)" \
 	PKG_LAYER_COMMIT_ID="$(TOOLKIT_LAYER_COMMIT_ID)" \
 	PKG_LAYER_COMMIT="$(TOOLKIT_LAYER_COMMIT)" \

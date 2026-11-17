@@ -37,9 +37,11 @@ endif
 all: $(DOWNLOADS_DIR) $(STAMP_DIR) $(EXPORT_DIR)
 	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.install || exit 1; done;
 
-# fs - lay out export/deploy from the built packages (defs.fs.mk::fs_deploy).
+# fs - lay out export/deploy from the built packages (defs.fs.mk::fs_deploy) and
+# generate the SDK overlay (defs.toolkit.mk::build_sdk_overlay).
 fs: all
 	$(call fs_deploy)
+	$(call build_sdk_overlay)
 
 # image - pack the bootable FAT32 ros2.img (defs.image.mk::build_fs).
 image: fs $(ROS2_IMG)
