@@ -10,7 +10,7 @@
 # Included from the top-level Makefile (alongside defs.common/packages/vxworks/
 # python). Depends on vars from those: TOP_BUILDDIR, EXPORT_DIR, ROOT_DIR,
 # DEPLOY_DIR, PACKAGE_DIR, BUILDSPECS_DIR, ROS_DISTRO, WIND_RELEASE_ID,
-# TGT_ARCH, WIND_CC_SYSROOT, WIND_SDK_HOME.
+# TGT_ARCH, SDK_NAME (defs.vxworks.mk: from the SDK, or from the SDK overlay).
 
 # --- toolkit layout / naming ------------------------------------------------
 # TOOLKIT_SRC_DIR = the committed kit tooling in the repo (scripts, host-shims,
@@ -52,7 +52,7 @@ define build_toolkit
 	EXPORT_DIR="$(EXPORT_DIR)" ROOT_DIR="$(ROOT_DIR)" DEPLOY_DIR="$(DEPLOY_DIR)" \
 	PACKAGE_DIR="$(PACKAGE_DIR)" BUILDSPECS_DIR="$(BUILDSPECS_DIR)" \
 	ROS_DISTRO="$(ROS_DISTRO)" WIND_RELEASE_ID="$(WIND_RELEASE_ID)" \
-	TGT_ARCH="$(TGT_ARCH)" WIND_SDK_HOME="$(WIND_SDK_HOME)" \
+	TGT_ARCH="$(TGT_ARCH)" SDK_NAME="$(SDK_NAME)" \
 	SDK_OVERLAY_STAGE="$(SDK_OVERLAY_STAGE)" \
 	PKG_LAYER_URL="$(TOOLKIT_LAYER_URL)" \
 	PKG_LAYER_COMMIT_ID="$(TOOLKIT_LAYER_COMMIT_ID)" \

@@ -4,7 +4,7 @@
 # the environment:
 #
 #   TOP_BUILDDIR EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR
-#   ROS_DISTRO WIND_RELEASE_ID TGT_ARCH WIND_SDK_HOME
+#   ROS_DISTRO WIND_RELEASE_ID TGT_ARCH SDK_NAME
 #   SDK_OVERLAY_STAGE TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL
 #
 # It reads no SDK files: everything SDK-specific comes from the SDK overlay.
@@ -25,7 +25,7 @@ die()  { printf 'toolkit FAILED: %s\n' "$*" >&2; exit 1; }
 need() { [ -n "${!1:-}" ] || die "env var $1 is required (run via 'make toolkit')"; }
 
 for v in TOP_BUILDDIR EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR \
-         ROS_DISTRO WIND_SDK_HOME SDK_OVERLAY_STAGE \
+         ROS_DISTRO SDK_NAME SDK_OVERLAY_STAGE \
          TOOLKIT_SRC_DIR TOOLKIT_STAGE TOOLKIT_TARBALL; do need "$v"; done
 
 STAGE="$TOOLKIT_STAGE"
@@ -88,7 +88,7 @@ if [ -f "$PKGMK" ] && [ -f "$GENMANIFEST" ]; then
       "$PKGMK" \
       "$ROS_DISTRO" \
       "${WIND_RELEASE_ID:-unknown}" \
-      "$(basename "$WIND_SDK_HOME")" \
+      "$SDK_NAME" \
       "${TGT_ARCH:-unknown}" \
       "${PKG_LAYER_URL:-https://github.com/Wind-River/vxworks7-layer-for-ros2.git}" \
       "${PKG_LAYER_COMMIT_ID:-$ROS_DISTRO-release-${WIND_RELEASE_ID:-}}" \

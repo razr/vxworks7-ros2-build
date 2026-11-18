@@ -4,7 +4,7 @@
 # (mk/usr/defs.sdk_overlay.mk::build_sdk_overlay) with these vars in the environment:
 #
 #   TOP_BUILDDIR PACKAGE_DIR BUILDSPECS_DIR WIND_CC_SYSROOT WIND_SDK_HOME
-#   WIND_RELEASE_ID SDK_OVERLAY_STAGE SDK_OVERLAY_TARBALL SDK_OVERLAY_INSTALLER
+#   WIND_RELEASE_ID TGT_ARCH SDK_NAME SDK_OVERLAY_STAGE SDK_OVERLAY_TARBALL SDK_OVERLAY_INSTALLER
 #
 # Output (a build output, like export/root and ros2.img):
 #   $SDK_OVERLAY_STAGE/files/                  files to copy into the SDK, laid out
@@ -33,7 +33,7 @@ die()  { printf 'sdk-overlay FAILED: %s\n' "$*" >&2; exit 1; }
 need() { [ -n "${!1:-}" ] || die "env var $1 is required (run via 'make sdk-overlay')"; }
 
 for v in TOP_BUILDDIR PACKAGE_DIR BUILDSPECS_DIR WIND_CC_SYSROOT WIND_SDK_HOME \
-         WIND_RELEASE_ID SDK_OVERLAY_STAGE SDK_OVERLAY_TARBALL SDK_OVERLAY_INSTALLER; do need "$v"; done
+         WIND_RELEASE_ID TGT_ARCH SDK_NAME SDK_OVERLAY_STAGE SDK_OVERLAY_TARBALL SDK_OVERLAY_INSTALLER; do need "$v"; done
 
 STAGE="$SDK_OVERLAY_STAGE"
 OV="$STAGE/files"
@@ -177,9 +177,11 @@ toolchain_overlay() {
 # name, holding exactly that step's changes. install-sdk-overlay.sh installs them
 # in this order (<step>_install).
 write_inventory() {
-  python3 - "$STEPS" "$REMOVED_LIST" "$REQUIREMENTS" "$GET_PIP" "$SDK_OVERLAY_JSON" <<'PY'
+  python3 - "$STEPS" "$REMOVED_LIST" "$REQUIREMENTS" "$GET_PIP" "$SDK_OVERLAY_JSON" \
+            "$WIND_RELEASE_ID" "$TGT_ARCH" "$SDK_NAME" "$WIND_SDK_HOME/sdk.json" <<'PY'
 import json, os, sys
-steps_dir, removed, reqs, get_pip, out = sys.argv[1:6]
+steps_dir, removed, reqs, get_pip, out, release, arch, name, sdk_json = sys.argv[1:10]
+bsp = json.load(open(sdk_json)).get("bsp", "") if os.path.exists(sdk_json) else ""
 lines = lambda p: [l.strip() for l in open(p) if l.strip()]
 steps = {}
 for f in sorted(os.listdir(steps_dir)):
@@ -195,6 +197,10 @@ doc = {
                  "(<3pp>/<tree>/X -> <3pp>/.removed/<tree>/X), bootstraps pip with 'get_pip', pip installs "
                  "'pip_requirements' with the SDK python and creates 'crossenv'. "
                  "Paths relative to the SDK root.",
+  # the SDK this overlay is for: install-sdk-overlay.sh refuses another one, and
+  # make toolkit takes these from here (no SDK needed). name = the SDK's sdk.version,
+  # bsp = the exact BSP from its sdk.json
+  "sdk": {"release": release, "arch": arch, "bsp": bsp, "name": name},
   "steps": steps,
 }
 json.dump(doc, open(out, "w"), indent=2)

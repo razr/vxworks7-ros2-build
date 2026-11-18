@@ -11,7 +11,8 @@
 #   sdk_fix_install  python_fix_install  vxworks_fix_install  sdk_install_install
 #   rust_fix_install  unixextra_install_install  toolchain_install
 #
-# Each step installs only its own files and checks its result. Idempotent.
+# It first checks that the SDK is the one the overlay was made for (sdk_overlay.json
+# "sdk"). Each step installs only its own files and checks its result. Idempotent.
 set -euo pipefail
 
 OV_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" && pwd)"
@@ -52,6 +53,23 @@ copy_files() {
   printf '%s\n' "$list" | ( cd "$OV" && tar -cf - --no-recursion -T - ) | tar -C "$WRSDK" -xf - \
     || die "$1: copying files failed"
   log "$1: copied $(printf '%s\n' "$list" | wc -l) file(s)"
+}
+
+# --- the SDK must be the one the overlay was made for ------------------------------
+# (sdk_overlay.json "sdk": its sdk.version name, the release, the exact BSP)
+sdk_match_check() {
+  # the overlay's value for each key against this SDK's own
+  local want have k
+  for k in name release bsp; do
+    want="$("$PY39" -c 'import json,sys; print(json.load(open(sys.argv[1]))["sdk"].get(sys.argv[2], ""))' "$OV_JSON" "$k")"
+    case "$k" in
+      name)    have="$(cat "$WRSDK/sdk.version" 2>/dev/null || basename "$WRSDK")" ;;
+      release) have="$(sed -n 's/^_WRS_CONFIG_CORE_RELEASE=//p' "$WIND_CC_SYSROOT/h/config/auto.conf" 2>/dev/null)" ;;
+      bsp)     have="$("$PY39" -c 'import json,sys; print(json.load(open(sys.argv[1])).get("bsp", ""))' "$WRSDK/sdk.json" 2>/dev/null)" ;;
+    esac
+    [ "$have" = "$want" ] || die "SDK mismatch ($k): overlay is for '$want', this SDK is '${have:-unknown}'"
+  done
+  log "SDK match: $(cat "$WRSDK/sdk.version" 2>/dev/null) (release, bsp checked)"
 }
 
 # --- pkg/sdk sdk_fix ------------------------------------------------------------
@@ -149,6 +167,7 @@ toolchain_install() {
   [ -f "$WRSDK/vxsdk/sysroot/mk/toolchain.cmake" ] || die "toolchain: toolchain.cmake missing"
 }
 
+sdk_match_check
 sdk_fix_install
 python_fix_install
 vxworks_fix_install
