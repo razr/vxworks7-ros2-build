@@ -1,5 +1,5 @@
 proc test05-sros2_talker_py {} {
-    puts "\nTEST: SROS2"
+    test_header "SROS2"
     set timeout 600
 
     # Check for ca.cert.pem, otherwise skip. Note: VxWorks 'ls' on a missing
@@ -21,10 +21,10 @@ proc test05-sros2_talker_py {} {
             vxworks::send_cmd $qemu::spawn_id "rtp delete /usr/lib/demo_nodes_cpp/talker"
         }
         -re {Can't open|No such file or directory} {
-            puts "demo_keystore not found, skipping SROS2 test."
+            test_skip "demo_keystore not found"
         }
         timeout {
-            puts "\nFAIL test05: timed out checking for the demo keystore"
+            test_fail "timed out checking for the demo keystore"
         }
     }
 }

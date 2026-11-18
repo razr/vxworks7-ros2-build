@@ -1,5 +1,5 @@
 proc test03-timer_lambda_py {} {
-    puts "\nTEST: TIMER LAMBDA PYTHON"
+    test_header "TIMER LAMBDA PYTHON"
     # 'python3 ros2 run' is slow to start on the target: the interpreter scans
     # pkg_resources metadata off the image before the node runs. Give it room,
     # and fail loudly instead of falling through to Ctrl-C a half-started python.
@@ -9,9 +9,8 @@ proc test03-timer_lambda_py {} {
         expect {
             -exact {Hello, world!} { }
             timeout {
-                puts "\nFAIL test03: timed out waiting for 'Hello, world!' (#[expr {$i + 1}])"
                 send_ctrl_c
-                return
+                test_fail "timed out waiting for 'Hello, world!' (#[expr {$i + 1}])"
             }
         }
     }

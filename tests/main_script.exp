@@ -15,7 +15,11 @@ source [file join $test_directory lib vxworks.exp]
 source [file join $test_directory lib qemu.exp]
 source [file join $test_directory lib telnet.exp]
 
-# Function to run all tests
+# Function to run all tests. Each test proc either returns normally (PASS),
+# raises an error (FAIL: test_fail, vxworks::run_node, or any Tcl error), or
+# calls test_skip (SKIP). The results are collected in ::test_results and
+# summarised (and turned into the exit status) by report_tests.
+set test_results {}
 proc run_tests {test_scripts} {
     foreach test_script $test_scripts {
         source $test_script
@@ -23,8 +27,21 @@ proc run_tests {test_scripts} {
     set all_procs [info procs]
     set test_procs [lsort [lsearch -all -inline $all_procs test*]]
     foreach test_function $test_procs {
-        if {[string match "test*" $test_function]} {
-            $test_function
+        if {[string match "test*" $test_function] && ![string match "test_*" $test_function]} {
+            set code [catch {$test_function} err opts]
+            if {$code == 0 || $code == 2} {
+                puts "\nPASS $test_function"
+                lappend ::test_results PASS $test_function
+            } elseif {[dict get $opts -errorcode] eq {TEST SKIP}} {
+                puts "\nSKIP $test_function: $err"
+                lappend ::test_results SKIP $test_function
+            } else {
+                puts "\nFAIL $test_function: $err"
+                lappend ::test_results FAIL $test_function
+                # The test did not reach its own cleanup: stop whatever it left
+                # running in the foreground of the serial console.
+                qemu::send_ctrl_c
+            }
             # Back to the serial console: a test may have left the telnet spawn
             # as the implicit channel.
             set spawn_id $qemu::spawn_id
@@ -38,9 +55,38 @@ proc run_tests {test_scripts} {
     }
 }
 
+# Print the per-test results and return the exit status: 1 if any test failed.
+proc report_tests {} {
+    set failed 0
+    puts "\nTest results:"
+    foreach {result name} $::test_results {
+        puts "  $result $name"
+        if {$result eq "FAIL"} { incr failed }
+    }
+    puts "[expr {[llength $::test_results] / 2}] run, $failed failed"
+    return [expr {$failed > 0}]
+}
+
+# Fail / skip the calling test with a reason (see run_tests). Both raise a Tcl
+# error so they also leave the test from inside an expect action; a skip is
+# told apart by its errorCode.
+proc test_fail {reason} { error $reason }
+proc test_skip {reason} { error $reason {} {TEST SKIP} }
+
 # Back-compat shims so existing test*.exp keep working unchanged.
 proc send_ctrl_c {} { qemu::send_ctrl_c }
 proc quit_qemu {}   { qemu::quit }
+
+# Print a test's banner, numbered from the calling test proc's name (test03-* ->
+# "TEST 03: ..."), so the number has one source: the test's file/proc name.
+proc test_header {title} {
+    set caller [lindex [info level -1] 0]
+    if {[regexp {^test(\d+)} $caller -> num]} {
+        puts "\nTEST $num: $title"
+    } else {
+        puts "\nTEST: $title"
+    }
+}
 
 # Function to display usage information
 proc show_usage {} {
@@ -140,5 +186,5 @@ qemu::quit
 # Wait for QEMU to finish
 wait
 
-# Exit Expect script
-exit
+# Exit Expect script: non-zero if any test failed (see report_tests)
+exit [report_tests]

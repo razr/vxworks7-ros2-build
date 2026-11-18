@@ -1,5 +1,5 @@
 proc test08-talker-cyclonedds {} {
-    puts "\nTEST: PUB/SUB (rmw_cyclonedds_cpp, loopback via CYCLONEDDS_URI)"
+    test_header "PUB/SUB (rmw_cyclonedds_cpp, loopback via CYCLONEDDS_URI)"
 
     # Same talker/listener as test04 but using the CycloneDDS RMW. CycloneDDS
     # does not use FASTDDS_BUILTIN_TRANSPORTS; on VxWorks two RTPs only discover

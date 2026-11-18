@@ -84,11 +84,26 @@ namespace eval vxworks {
     }
 
     # Run a node/RTP on the given channel and expect its completion marker
-    # 'count' times (default 5).
+    # 'count' times (default 5). Raises a Tcl error (the test fails) on a
+    # timeout, a closed console, or the node aborting/crashing (signal 6/11)
+    # before the marker was seen 'count' times.
     proc run_node {id cmd marker {count 5}} {
         send_cmd $id "$cmd"
         for {set i 0} {$i < $count} {incr i} {
-            expect -i $id -exact $marker
+            expect -i $id \
+                -exact $marker {} \
+                -re {terminating due to uncaught exception[^\r\n]*} {
+                    error "node aborted: $expect_out(0,string)"
+                } \
+                -re {has been deleted due to signal (6|11)} {
+                    error "node crashed: $expect_out(0,string)"
+                } \
+                timeout {
+                    error "timed out waiting for '$marker' ($i of $count seen)"
+                } \
+                eof {
+                    error "console closed waiting for '$marker' ($i of $count seen)"
+                }
         }
     }
 

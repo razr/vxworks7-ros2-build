@@ -1,5 +1,5 @@
 proc test06-rclrs {} {
-    puts "\nTEST: RCLRS PUB/SUB (Rust, rmw_fastrtps_cpp, SHM)"
+    test_header "RCLRS PUB/SUB (Rust, rmw_fastrtps_cpp, SHM)"
 
     # Pin RMW + transport explicitly (Fast-DDS shared memory), on BOTH the serial
     # console (publisher) and the telnet console (subscriber) -- env is per-RTP.

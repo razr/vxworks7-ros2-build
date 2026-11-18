@@ -17,7 +17,7 @@
 # Python startup on the target is slow, so use a long timeout. If the USB dir was
 # not attached, ros2 run can't find the package; we SKIP rather than hang.
 proc test11-toolkit-python-hello {} {
-    puts "\nTEST: SDK-toolkit Python hello (ament_python / rclpy self-test)"
+    test_header "SDK-toolkit Python hello (ament_python / rclpy self-test)"
 
     set timeout 600
     # Add /bd0a to the target defaults. AMENT_PREFIX_PATH keeps /usr FIRST so the
@@ -34,25 +34,22 @@ proc test11-toolkit-python-hello {} {
     expect {
         -re {Process 'python3'.*launched\.} { }
         -re {Package '?hello_python'? not found|No executable found for package|unable to find executable} {
-            puts "\ntest11 SKIP: hello_python not present on /bd0a (run selftest-build.sh --lang python + boot with VX_USB)"
-            return
+            test_skip "hello_python not present on /bd0a (run selftest-build.sh --lang python + boot with VX_USB)"
         }
         timeout {
-            puts "\nFAIL test11: ros2 run did not launch python3"
             send_ctrl_c
-            return
+            test_fail "ros2 run did not launch python3"
         }
     }
     expect {
         -exact {Hello from Python, world!} {
-            puts "\nPASS test11: toolkit-built ament_python node printed the marker (ros2 run)"
         }
         -re {Segmentation violation|signal 11|Traceback|DistributionNotFound|Error} {
-            puts "\nFAIL test11: node crashed/errored before printing the marker"
+            test_fail "node crashed/errored before printing the marker"
         }
         timeout {
-            puts "\nFAIL test11: timed out waiting for the marker from ros2 run hello_python"
             send_ctrl_c
+            test_fail "timed out waiting for the marker from ros2 run hello_python"
         }
     }
 }

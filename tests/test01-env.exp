@@ -1,5 +1,5 @@
 proc test01-set_env {} {
-    puts "\nTEST: PRINT ENVIRONMENT"
+    test_header "PRINT ENVIRONMENT"
     vxworks::send_cmd $qemu::spawn_id "set env"
     expect -exact {LD_LIBRARY_PATH}
     expect -exact {AMENT_PREFIX_PATH}

@@ -8,7 +8,7 @@
 # If the USB dir was not attached (VX_USB unset) the binary is absent; we detect
 # that and SKIP rather than hang, so a normal image run of the suite is unaffected.
 proc test09-toolkit-cpp-hello {} {
-    puts "\nTEST: SDK-toolkit C++ hello (toolkit self-test)"
+    test_header "SDK-toolkit C++ hello (toolkit self-test)"
 
     # Point the loader + ament index at /bd0a (plus the baked /usr base). A
     # toolkit-built RTP links ROS 2 .so deps that live under /bd0a/lib; keep /usr
@@ -18,13 +18,12 @@ proc test09-toolkit-cpp-hello {} {
     vxworks::send_cmd $qemu::spawn_id "/bd0a/lib/hello_cpp/hello_cpp"
     expect {
         -exact {Hello from C++, world!} {
-            puts "\nPASS test09: toolkit-built C++ RTP printed the marker"
         }
         -re {Can't open file|No such file or directory|INSTANTIATE_FAILED} {
-            puts "\ntest09 SKIP: /bd0a/lib/hello_cpp/hello_cpp not present (run selftest-build.sh --lang cpp + boot with VX_USB)"
+            test_skip "/bd0a/lib/hello_cpp/hello_cpp not present (run selftest-build.sh --lang cpp + boot with VX_USB)"
         }
         timeout {
-            puts "\nFAIL test09: timed out waiting for the marker from hello_cpp"
+            test_fail "timed out waiting for the marker from hello_cpp"
         }
     }
 }
