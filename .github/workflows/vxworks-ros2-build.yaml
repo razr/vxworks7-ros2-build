@@ -291,17 +291,8 @@ jobs:
         with:
           ref: ${{ github.ref }}
 
-      # Only for make's SDK variables (release id, arch, SDK name): make toolkit
-      # reads no SDK files, everything SDK-specific comes from the SDK overlay.
-      - name: Get the VxWorks SDK
-        uses: ./.github/actions/setup-wrsdk
-        with:
-          sdks_list: wrsdks.json
-          sdk: ${{ needs.build.outputs.sdk }}
-          vxworks: ${{ inputs.vxworks }}
-          directory: /tmp/vanilla
-          sdkenv: true
-
+      # No SDK here: make toolkit reads no SDK files, and the SDK identity
+      # (release id, arch, SDK name) comes from the SDK overlay's sdk_overlay.json.
       - name: Download the HDD image
         uses: actions/download-artifact@v4
         with:
