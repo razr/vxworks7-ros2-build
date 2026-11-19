@@ -315,7 +315,8 @@ jobs:
           cd ${{ github.workspace }}/output
           tar --zstd -xf ros2-sdk.tar.zst && rm ros2-sdk.tar.zst
           mkdir -p sdk-overlay-build
-          tar --zstd -C sdk-overlay-build -xf sdk-overlay-*.tar.zst
+          # make-sdk-overlay.sh writes .tar.zst, or .tar.gz without zstd: let tar detect it
+          tar -C sdk-overlay-build -xf sdk-overlay-*.tar.*
           ls -ld export/root sdk-overlay-build/sdk-overlay-* ros2.img
           cd ${{ github.workspace }} && make toolkit
 
