@@ -1,14 +1,10 @@
-# Pinned base image (multi-arch index digest of ubuntu:24.04, created 2026-11-10).
-# The tag is re-pointed on every Docker Hub refresh; pinning keeps the image and
-# the CI layer cache stable. To update: docker buildx imagetools inspect ubuntu:24.04
-ARG UBUNTU_IMAGE=ubuntu:24.04@sha256:73b999393d07f2bf65a40373778a44dc9a6d54ad7718d29247d8ff9413c4d6a8
-FROM ${UBUNTU_IMAGE}
+FROM ubuntu:24.04
 
 RUN dpkg --add-architecture i386 && \
-  apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
+  apt-get update && apt-get -y dist-upgrade && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   g++-multilib libstdc++6:i386 libgtk2.0-0:i386 libxtst6:i386 \
   gtk2-engines-murrine:i386 libcanberra-gtk-module:i386 libatk-adaptor:i386 \
-  unzip bc git wget file \
+  unzip bc git wget \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
