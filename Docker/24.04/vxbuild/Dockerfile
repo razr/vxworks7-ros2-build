@@ -8,7 +8,7 @@ RUN dpkg --add-architecture i386 && \
   apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y \
   g++-multilib libstdc++6:i386 libgtk2.0-0:i386 libxtst6:i386 \
   gtk2-engines-murrine:i386 libcanberra-gtk-module:i386 libatk-adaptor:i386 \
-  unzip bc git wget zstd \
+  unzip bc git wget file \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 

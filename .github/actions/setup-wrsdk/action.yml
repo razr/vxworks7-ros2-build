@@ -59,18 +59,24 @@ runs:
         cd ${{ inputs.directory }}
         echo SDK_URL=$(cat sdk-url.txt) >> $GITHUB_ENV
         echo FILENAME=$(basename $(cat sdk-url.txt)) >> $GITHUB_ENV
+        # One tarball path for every caller, whatever 'directory' is: the cache
+        # entry is matched on key AND path, so a per-directory path made each
+        # caller (build: /tmp, toolkit-selftest: /tmp/vanilla) miss and re-download.
+        echo SDK_TARBALL=/tmp/wrsdk-dl/$(basename $(cat sdk-url.txt)) >> $GITHUB_ENV
       shell: bash
 
     - name: Cache SDK tarball
       id: cache-sdk-tarball
       uses: actions/cache@v4
       with:
-        path: ${{ inputs.directory }}/${{ env.FILENAME }}
+        path: ${{ env.SDK_TARBALL }}
         key: ${{ runner.os }}-sdk-tarball-${{ env.FILENAME }}
 
     - name: Download SDK
       if: steps.cache-sdk-tarball.outputs.cache-hit != 'true'
-      run: wget --no-check-certificate ${{ env.SDK_URL }} -P ${{ inputs.directory }}
+      run: |
+        mkdir -p $(dirname ${{ env.SDK_TARBALL }})
+        wget --no-check-certificate ${{ env.SDK_URL }} -O ${{ env.SDK_TARBALL }}
       shell: bash
 
     - name: Cache extracted SDK
@@ -85,7 +91,7 @@ runs:
       run: |
         mkdir -p ${{ inputs.directory }}/wrsdk
         cd  ${{ inputs.directory }}/wrsdk
-        tar xvfj ${{ inputs.directory }}/${{ env.FILENAME }} --strip 1
+        tar xvfj ${{ env.SDK_TARBALL }} --strip 1
       shell: bash
 
     - name: Source SDK environment

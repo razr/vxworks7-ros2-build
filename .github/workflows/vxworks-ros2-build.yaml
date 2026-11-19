@@ -101,21 +101,6 @@ jobs:
           sudo apt-get clean || true
           echo "Disk after cleanup:"; df -h /
 
-      - name: Resolve supported Ubuntu version
-        id: version
-        run: |
-          sudo apt-get update && sudo apt-get install -y jq
-
-          # Look up the ubuntu version for the selected distro in ros2.json
-          UBUNTU_VER=$(jq -r ".[\"${{ env.ros_distro }}\"].ubuntu" .github/workflows/ros2.json)
-
-          if [ "$UBUNTU_VER" == "null" ]; then
-            echo "Error: Distro ${{ env.ros_distro }} not found in ros2.json"
-            exit 1
-          fi
-
-          echo "ubuntu=$UBUNTU_VER" >> $GITHUB_OUTPUT
-
       - name: Use Download SDK action
         uses: ./.github/actions/setup-wrsdk
         with:
@@ -125,46 +110,11 @@ jobs:
           directory: /tmp
           sdkenv: false
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      # vxbuild + vxros2build images (needs the registry service above)
+      - name: Build the vxros2build container
+        uses: ./.github/actions/setup-vxros2build
         with:
-          driver-opts: network=host
-
-      - name: Build vxbuild docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: Docker/${{ steps.version.outputs.ubuntu }}/vxbuild/.
-          push: true
-          tags: localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
-          cache-from: type=gha,scope=vxbuild-${{ steps.version.outputs.ubuntu }}
-          cache-to: type=gha,mode=max,scope=vxbuild-${{ steps.version.outputs.ubuntu }}
-        env:
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
-
-      - name: Inspect
-        run: |
-          docker buildx imagetools inspect localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
-
-      - name: Build vxros2build docker image
-        uses: docker/build-push-action@v6
-        with:
-          context: Docker/${{ steps.version.outputs.ubuntu }}/vxros2build/.
-          push: false
-          load: true
-          build-args: |
-            ROS_DISTRO=${{ env.ros_distro }}
-            BASE_IMAGE=localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
-          tags: vxros2build:${{ env.ros_distro }}
-          cache-from: type=gha,scope=vxros2build-${{ env.ros_distro }}
-          cache-to: type=gha,mode=max,scope=vxros2build-${{ env.ros_distro }}
-        env:
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
-
-      - name: Verify Docker vxros2build:${{ env.ros_distro }} image
-        run: |
-          docker images vxros2build:${{ env.ros_distro }}
+          ros_distro: ${{ env.ros_distro }}
 
       - name: Restore ccache (ROS 2 C/C++ compile cache)
         uses: actions/cache@v4
@@ -374,6 +324,11 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [build, toolkit]
     if: ${{ inputs.test && inputs.toolkit }}
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -398,19 +353,34 @@ jobs:
           directory: /tmp/vanilla
           sdkenv: false
 
+      - name: Build the vxros2build container
+        id: vxros2build
+        uses: ./.github/actions/setup-vxros2build
+        with:
+          ros_distro: ${{ needs.build.outputs.ros_distro }}
+
       - name: Toolkit self-test — build the C++/Rust/Python samples from the toolkit
         run: |
-          # The toolkit user's path: a vanilla SDK + the toolkit tarball, on the
-          # host (no build container). selftest-build.sh unpacks the toolkit,
-          # applies it to the SDK (ros2sdk-prepare.sh), builds one node per
-          # language and stages install/ on a USB dir (-> /bd0a on target).
-          sudo apt-get install -y zstd
+          # A vanilla SDK + the toolkit, built in the vxros2build container like the
+          # main build. The toolkit is unpacked here on the host (tar detects the
+          # compression) and passed as a directory; selftest-build.sh applies it to
+          # the SDK (ros2sdk-prepare.sh), builds one node per language and stages
+          # install/ on a USB dir (-> /bd0a on target). The workspace and the SDK
+          # are mounted at their host paths, so the absolute paths it writes to
+          # selftest.env are valid on the host for the next step.
           cd ${{ github.workspace }}
-          TK="$(ls toolkit-dl/toolkit-*.tar.* | head -1)"
-          [ -f "$TK" ] || { echo "no toolkit tarball in toolkit-dl/"; exit 1; }
-          set +u; . /tmp/vanilla/wrsdk/sdkenv.sh; set -u
-          ./toolkit/scripts/selftest-build.sh --toolkit "$TK" --sdk /tmp/vanilla/wrsdk \
-            --workdir ${{ github.workspace }}/selftest
+          TGZ="$(ls toolkit-dl/toolkit-*.tar.* | head -1)"
+          [ -f "$TGZ" ] || { echo "no toolkit tarball in toolkit-dl/"; exit 1; }
+          mkdir -p toolkit-dl/unpacked && tar -C toolkit-dl/unpacked -xf "$TGZ"
+          TK="$(find toolkit-dl/unpacked -mindepth 1 -maxdepth 1 -type d | head -1)"
+          [ -d "$TK" ] || { echo "no top-level dir in $TGZ"; exit 1; }
+          SDK=/tmp/vanilla/wrsdk
+          docker run --rm \
+            -e UID=$(id -u) -e GID=$(id -g) \
+            -v $SDK:$SDK \
+            -v ${{ github.workspace }}:${{ github.workspace }} \
+            ${{ steps.vxros2build.outputs.image }} \
+            /bin/bash -c "set -- $SDK/sdkenv.sh; . $SDK/sdkenv.sh && cd ${{ github.workspace }} && ./toolkit/scripts/selftest-build.sh --toolkit $PWD/$TK --sdk $SDK --workdir ${{ github.workspace }}/selftest"
           echo "--- selftest.env ---"; cat selftest/selftest.env
 
       - name: Pack the USB stage and the toolkit image

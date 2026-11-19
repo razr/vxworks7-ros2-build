@@ -1,0 +1,90 @@
+# Build the VxWorks ROS 2 build container: vxbuild:<ubuntu> (pushed to the job's
+# local registry, as the base) and vxros2build:<ros_distro> (loaded into the local
+# docker daemon). Layers come from the GHA cache (scopes vxbuild-<ubuntu> and
+# vxros2build-<ros_distro>), so a second job reusing the image is mostly restores.
+#
+# The calling job must run a registry service on localhost:5000 (composite actions
+# cannot declare services):
+#   services:
+#     registry:
+#       image: registry:2
+#       ports:
+#         - 5000:5000
+
+name: 'Setup vxros2build'
+description: 'Build the vxbuild + vxros2build docker images for a ROS 2 distro'
+
+inputs:
+  ros_distro:
+    description: 'ROS 2 distro (selects the Ubuntu version via .github/workflows/ros2.json)'
+    required: true
+
+outputs:
+  ubuntu:
+    description: 'Ubuntu version of the image'
+    value: ${{ steps.version.outputs.ubuntu }}
+  image:
+    description: 'Local image tag'
+    value: vxros2build:${{ inputs.ros_distro }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Resolve supported Ubuntu version
+      id: version
+      run: |
+        sudo apt-get update && sudo apt-get install -y jq
+
+        # Look up the ubuntu version for the selected distro in ros2.json
+        UBUNTU_VER=$(jq -r ".[\"${{ inputs.ros_distro }}\"].ubuntu" .github/workflows/ros2.json)
+
+        if [ "$UBUNTU_VER" == "null" ]; then
+          echo "Error: Distro ${{ inputs.ros_distro }} not found in ros2.json"
+          exit 1
+        fi
+
+        echo "ubuntu=$UBUNTU_VER" >> $GITHUB_OUTPUT
+      shell: bash
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+      with:
+        driver-opts: network=host
+
+    - name: Build vxbuild docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: Docker/${{ steps.version.outputs.ubuntu }}/vxbuild/.
+        push: true
+        tags: localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
+        cache-from: type=gha,scope=vxbuild-${{ steps.version.outputs.ubuntu }}
+        cache-to: type=gha,mode=max,scope=vxbuild-${{ steps.version.outputs.ubuntu }}
+      env:
+        DOCKER_BUILD_SUMMARY: false
+        DOCKER_BUILD_RECORD_UPLOAD: false
+
+    - name: Inspect
+      run: |
+        docker buildx imagetools inspect localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
+      shell: bash
+
+    - name: Build vxros2build docker image
+      uses: docker/build-push-action@v6
+      with:
+        context: Docker/${{ steps.version.outputs.ubuntu }}/vxros2build/.
+        push: false
+        load: true
+        build-args: |
+          ROS_DISTRO=${{ inputs.ros_distro }}
+          BASE_IMAGE=localhost:5000/local/vxbuild:${{ steps.version.outputs.ubuntu }}
+        tags: vxros2build:${{ inputs.ros_distro }}
+        cache-from: type=gha,scope=vxros2build-${{ inputs.ros_distro }}
+        cache-to: type=gha,mode=max,scope=vxros2build-${{ inputs.ros_distro }}
+      env:
+        DOCKER_BUILD_SUMMARY: false
+        DOCKER_BUILD_RECORD_UPLOAD: false
+
+    - name: Verify Docker vxros2build:${{ inputs.ros_distro }} image
+      run: |
+        docker images vxros2build:${{ inputs.ros_distro }}
+      shell: bash
