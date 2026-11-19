@@ -63,13 +63,17 @@ on:
         type: boolean
 
 jobs:
+  # The build container, built once per run (docker-build.yaml) and uploaded as
+  # the artifact "Docker Image vxros2build <ros_distro>"; the jobs that run in it
+  # (build, toolkit-selftest) download and docker-load it.
+  docker:
+    uses: ./.github/workflows/docker-build.yaml
+    with:
+      ros_distro: ${{ inputs.ros_distro }}
+
   build:
     runs-on: ubuntu-24.04
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
+    needs: docker
     outputs:
       sdk: ${{ steps.set_outputs.outputs.sdk }}
       ros_distro: ${{ steps.set_outputs.outputs.ros_distro }}
@@ -110,11 +114,17 @@ jobs:
           directory: /tmp
           sdkenv: false
 
-      # vxbuild + vxros2build images (needs the registry service above)
-      - name: Build the vxros2build container
-        uses: ./.github/actions/setup-vxros2build
+      - name: Download the vxros2build container
+        uses: actions/download-artifact@v4
         with:
-          ros_distro: ${{ env.ros_distro }}
+          name: Docker Image vxros2build ${{ env.ros_distro }}
+          path: /tmp/docker-image
+
+      - name: Load the vxros2build container
+        run: |
+          docker load -i /tmp/docker-image/vxros2build.${{ env.ros_distro }}.tar.gz
+          rm -rf /tmp/docker-image
+          docker images vxros2build:${{ env.ros_distro }}
 
       - name: Restore ccache (ROS 2 C/C++ compile cache)
         uses: actions/cache@v4
@@ -324,11 +334,6 @@ jobs:
     runs-on: ubuntu-24.04
     needs: [build, toolkit]
     if: ${{ inputs.test && inputs.toolkit }}
-    services:
-      registry:
-        image: registry:2
-        ports:
-          - 5000:5000
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -353,11 +358,17 @@ jobs:
           directory: /tmp/vanilla
           sdkenv: false
 
-      - name: Build the vxros2build container
-        id: vxros2build
-        uses: ./.github/actions/setup-vxros2build
+      - name: Download the vxros2build container
+        uses: actions/download-artifact@v4
         with:
-          ros_distro: ${{ needs.build.outputs.ros_distro }}
+          name: Docker Image vxros2build ${{ needs.build.outputs.ros_distro }}
+          path: /tmp/docker-image
+
+      - name: Load the vxros2build container
+        run: |
+          docker load -i /tmp/docker-image/vxros2build.${{ needs.build.outputs.ros_distro }}.tar.gz
+          rm -rf /tmp/docker-image
+          docker images vxros2build:${{ needs.build.outputs.ros_distro }}
 
       - name: Toolkit self-test — build the C++/Rust/Python samples from the toolkit
         run: |
@@ -379,7 +390,7 @@ jobs:
             -e UID=$(id -u) -e GID=$(id -g) \
             -v $SDK:$SDK \
             -v ${{ github.workspace }}:${{ github.workspace }} \
-            ${{ steps.vxros2build.outputs.image }} \
+            vxros2build:${{ needs.build.outputs.ros_distro }} \
             /bin/bash -c "set -- $SDK/sdkenv.sh; . $SDK/sdkenv.sh && cd ${{ github.workspace }} && ./toolkit/scripts/selftest-build.sh --toolkit $PWD/$TK --sdk $SDK --workdir ${{ github.workspace }}/selftest"
           echo "--- selftest.env ---"; cat selftest/selftest.env
 
