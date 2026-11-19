@@ -69,8 +69,10 @@ export COLCON_HOME="$TOOLKIT_DIR/export/root/.colcon"
 _vxmixin="$COLCON_HOME/mixin/default/vxworks.mixin"
 if [ ! -f "$_vxmixin" ]; then
   _err "no vxworks mixin at $_vxmixin -- run scripts/ros2sdk-prepare.sh first"
-elif grep -q '/work/' "$_vxmixin"; then
-  _err "vxworks mixin has un-relocated build paths (/work) -- re-run scripts/ros2sdk-prepare.sh"
+elif ! grep -qF "$TOOLKIT_DIR/export/root" "$_vxmixin"; then
+  # same check as ros2sdk-prepare.sh vxworks_mixin_relocate (a literal '/work/'
+  # also matches a toolkit that lives under e.g. /home/runner/work/)
+  _err "vxworks mixin does not point at this toolkit's export/root -- re-run scripts/ros2sdk-prepare.sh"
 fi
 unset _vxmixin
 
