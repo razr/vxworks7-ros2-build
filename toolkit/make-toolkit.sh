@@ -11,7 +11,7 @@
 #
 # It stages a self-contained toolkit:
 #   sdk-overlay/      - the SDK overlay (a build output of 'make sdk-overlay':
-#                       files/, sdk_overlay.json, install-sdk-overlay.sh)
+#                       files/, sdk-patches/, sdk_overlay.json, install-sdk-overlay.sh)
 #   export/root       - the prebuilt ROS 2 SDK (build apps against this)
 #   ros2.img          - bootable VxWorks target image (CONTAINS the target rootfs
 #                       that would otherwise be export/deploy; not shipped loose)

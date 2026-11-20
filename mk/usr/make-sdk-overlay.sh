@@ -9,6 +9,8 @@
 # Output (a build output, like export/root and ros2.img):
 #   $SDK_OVERLAY_STAGE/files/                  files to copy into the SDK, laid out
 #                                              like the SDK root
+#   $SDK_OVERLAY_STAGE/sdk-patches/            patches to apply to SDK files (pkg/sdk
+#                                              sdk-patches) + apply-sdk-patches.sh
 #   $SDK_OVERLAY_STAGE/sdk_overlay.json        inventory per step: those files, the
 #                                              SDK files to move aside, pip packages
 #   $SDK_OVERLAY_STAGE/install-sdk-overlay.sh  installs it into an SDK (<step>_install)
@@ -47,6 +49,7 @@ SDK_FILES="$PACKAGE_DIR/sdk/files"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 REMOVED_LIST="$WORK/removed"; : > "$REMOVED_LIST"
+PATCH_LIST="$WORK/patches"; : > "$PATCH_LIST"
 REQUIREMENTS="$WORK/requirements"; : > "$REQUIREMENTS"
 GET_PIP="$WORK/get-pip-url"; : > "$GET_PIP"
 
@@ -66,6 +69,19 @@ sdk_fix_overlay() {
   snapshot
   # defs.autotools.mk copied into the SDK's mk/
   install -D -m0644 "$SDK_FILES/defs.autotools.mk" "$OV_SYSROOT/mk/defs.autotools.mk"
+  # SDK file edits: the patches themselves + the script sdk_fix applied them with
+  # (pkg/sdk/files/apply-sdk-patches.sh), shipped in sdk-patches/ (not files/: they
+  # are applied, not copied). Each must be applied in the build's SDK.
+  local pd="$SDK_FILES/$WIND_RELEASE_ID/sdk-patches" pp
+  mkdir -p "$STAGE/sdk-patches"
+  install -m0755 "$SDK_FILES/apply-sdk-patches.sh" "$STAGE/sdk-patches/apply-sdk-patches.sh"
+  for pp in "$pd"/*.patch; do
+    [ -f "$pp" ] || continue
+    patch -d "$WIND_SDK_HOME" -p1 -R --dry-run -s -f < "$pp" >/dev/null 2>&1 \
+      || die "sdk_fix: $(basename "$pp") is not applied in $WIND_SDK_HOME (sdk_fix did not run?)"
+    install -m0644 "$pp" "$STAGE/sdk-patches/"
+    basename "$pp" >> "$PATCH_LIST"
+  done
   # SDK sqlite/libyaml/libcyaml moved to 3pp/.removed/<tree>/: taken from what the
   # build actually moved
   local rm_root="$WIND_CC_SYSROOT/usr/3pp/.removed"
@@ -74,7 +90,7 @@ sdk_fix_overlay() {
       | sed "s#^#$SYSROOT_REL/usr/3pp/#" | LC_ALL=C sort > "$REMOVED_LIST"
   fi
   record sdk_fix
-  log "sdk_fix: $(listed sdk_fix)+ $(wc -l < "$REMOVED_LIST") SDK file(s) to move aside"
+  log "sdk_fix: $(listed sdk_fix)+ $(wc -l < "$REMOVED_LIST") SDK file(s) to move aside, patches: $(tr '\n' ' ' < "$PATCH_LIST")"
 }
 
 # --- pkg/sdk vxworks_fix ------------------------------------------------------------
@@ -177,16 +193,17 @@ toolchain_overlay() {
 # name, holding exactly that step's changes. install-sdk-overlay.sh installs them
 # in this order (<step>_install).
 write_inventory() {
-  python3 - "$STEPS" "$REMOVED_LIST" "$REQUIREMENTS" "$GET_PIP" "$SDK_OVERLAY_JSON" \
+  python3 - "$STEPS" "$REMOVED_LIST" "$PATCH_LIST" "$REQUIREMENTS" "$GET_PIP" "$SDK_OVERLAY_JSON" \
             "$WIND_RELEASE_ID" "$TGT_ARCH" "$SDK_NAME" "$WIND_SDK_HOME/sdk.json" <<'PY'
 import json, os, sys
-steps_dir, removed, reqs, get_pip, out, release, arch, name, sdk_json = sys.argv[1:10]
+steps_dir, removed, patches, reqs, get_pip, out, release, arch, name, sdk_json = sys.argv[1:11]
 bsp = json.load(open(sdk_json)).get("bsp", "") if os.path.exists(sdk_json) else ""
 lines = lambda p: [l.strip() for l in open(p) if l.strip()]
 steps = {}
 for f in sorted(os.listdir(steps_dir)):
     steps[f.split("-", 1)[1]] = {"files": lines(os.path.join(steps_dir, f))}
 steps["sdk_fix"]["removed"] = lines(removed)
+steps["sdk_fix"]["patches"] = lines(patches)
 steps["python_fix"]["get_pip"] = open(get_pip).read().strip()
 steps["sdk_install"]["pip_requirements"] = [l for l in lines(reqs) if not l.startswith("#")]
 steps["sdk_install"]["crossenv"] = "vxsdk/host/x86_64-linux/cross_venv/cross"
@@ -194,7 +211,8 @@ doc = {
   "description": "SDK overlay, per build step (mk/usr/make-sdk-overlay.sh). "
                  "install-sdk-overlay.sh installs the steps in order: copies each "
                  "step's 'files' from files/ into the SDK, moves 'removed' aside "
-                 "(<3pp>/<tree>/X -> <3pp>/.removed/<tree>/X), bootstraps pip with 'get_pip', pip installs "
+                 "(<3pp>/<tree>/X -> <3pp>/.removed/<tree>/X), applies 'patches' "
+                 "(sdk-patches/, with sdk-patches/apply-sdk-patches.sh), bootstraps pip with 'get_pip', pip installs "
                  "'pip_requirements' with the SDK python and creates 'crossenv'. "
                  "Paths relative to the SDK root.",
   # the SDK this overlay is for: install-sdk-overlay.sh refuses another one, and

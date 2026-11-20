@@ -91,6 +91,14 @@ for rel in (l.strip() for l in sys.stdin):
     shutil.move(src, dst); n += 1
 print("== sdk_fix: moved aside %d SDK file(s)" % n)' "$WRSDK" || die "sdk_fix: moving aside SDK files failed"
   [ -f "$WRSDK/vxsdk/sysroot/mk/defs.autotools.mk" ] || die "sdk_fix: defs.autotools.mk missing"
+  # SDK file edits: apply the shipped patches with the script sdk_fix used
+  # (idempotent; fails if a patch neither applies nor is applied)
+  local n; n="$(step sdk_fix patches | grep -c . || true)"
+  if [ "$n" -gt 0 ]; then
+    "$OV_DIR/sdk-patches/apply-sdk-patches.sh" "$OV_DIR/sdk-patches" "$WRSDK" \
+      || die "sdk_fix: applying the SDK patches failed"
+  fi
+  log "sdk_fix: $n SDK patch(es)"
 }
 
 # --- pkg/sdk python_fix -----------------------------------------------------------
