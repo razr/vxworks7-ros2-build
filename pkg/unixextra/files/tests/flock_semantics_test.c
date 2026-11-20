@@ -13,6 +13,7 @@ prints LIMITATION, not FAIL. Exit status: number of failed cases.
 [vxWorks *]# /bd0a/flock_semantics_test
 ...
 FLOCK SEMANTICS: 9 passed, 0 failed, 1 limitation(s)
+UNIXEXTRA flock: PASS
 */
 
 #include <sys/file.h>
@@ -111,5 +112,6 @@ int main(int argc, char *argv[])
     unlink(file);
 
     printf("FLOCK SEMANTICS: %d passed, %d failed, %d limitation(s)\n", passed, failed, limitations);
+    printf("UNIXEXTRA flock: %s\n", failed ? "FAIL" : "PASS");
     return failed;
 }
