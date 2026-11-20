@@ -14,7 +14,7 @@
 #        rust   = ament_cargo   "Hello from Rust, world!"   (rclrs)
 #        python = ament_python  "Hello from Python, world!" (rclpy)
 #   4) ONE `colcon build --merge-install --mixin vxworks` of the whole workspace
-#   5) assert each compiled artifact (cpp/rust) is a VxWorks (x86-64, ld64.so.1) RTP
+#   5) assert each compiled artifact (cpp/rust) is a VxWorks RTP (x86-64 ld64.so.1 or aarch64 ld.so.1)
 #   6) Python: optimize-python-startup on install/ (unchecked-hash .pyc + launchers)
 #   7) stage the merged install/ tree onto the USB dir (-> /bd0a); the matching
 #      on-target proc (tests/toolkit/test01..03) runs it from /bd0a. ros2.img untouched.
@@ -151,15 +151,20 @@ command -v ros2   >/dev/null || die "ros2 not on PATH after ros2sdkenv.sh"
 # the workspace root.
 WS="$WORKDIR/ros2_ws"; mkdir -p "$WS/src"
 
-# assert_vxrtp <file> -- the built artifact must be a VxWorks RTP (x86-64 ELF with
-# the VxWorks ld64.so.1 interpreter), NOT a host (ld-linux) build. Proves the
-# cross toolchain + mixin actually applied.
+# assert_vxrtp <file> -- the built artifact must be a VxWorks RTP, NOT a host
+# (ld-linux) build: an ELF with the VxWorks interpreter of its target, x86-64
+# (ld64.so.1) or aarch64 (ld.so.1). Proves the cross toolchain + mixin applied.
 assert_vxrtp() {
   local f="$1" fi
   fi="$(file -L "$f")"; echo "  $f"; echo "  $fi"
   echo "$fi" | grep -q 'ELF 64-bit' || die "not an ELF: $fi"
-  echo "$fi" | grep -q 'x86-64'     || die "not x86-64: $fi"
-  echo "$fi" | grep -q 'ld64.so.1'  || die "interpreter not VxWorks ld64.so.1 (HOST build? mixin not applied): $fi"
+  if echo "$fi" | grep -q 'x86-64'; then
+    echo "$fi" | grep -q 'interpreter /lib/ld64.so.1' || die "interpreter not VxWorks ld64.so.1 (HOST build? mixin not applied): $fi"
+  elif echo "$fi" | grep -q 'ARM aarch64'; then
+    echo "$fi" | grep -q 'interpreter /lib/ld.so.1'   || die "interpreter not VxWorks ld.so.1 (HOST build? mixin not applied): $fi"
+  else
+    die "neither x86-64 nor aarch64: $fi"
+  fi
 }
 
 # stage <src> [destname] -- copy a built artifact into the USB staging dir. The

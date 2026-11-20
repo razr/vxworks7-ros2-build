@@ -25,7 +25,7 @@ proc test01-functions {} {
             -re {UNIXEXTRA [a-z_]+: PASS} {}
             -re {UNIXEXTRA [a-z_]+: FAIL} { lappend failed "$t: FAIL" }
             -re {has been deleted due to signal [0-9]+} { lappend failed "$t: crashed" }
-            -re {Can't open file|No such file or directory|INSTANTIATE_FAILED} { lappend failed "$t: not runnable" }
+            -re {Can't open file|No such file or directory|INSTANTIATE_FAILED|Cmd: '[^']*' not found} { lappend failed "$t: not runnable" }
             timeout { lappend failed "$t: no verdict (timeout)" }
         }
         vxworks::drain $qemu::spawn_id 2

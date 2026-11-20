@@ -14,8 +14,8 @@
 #   PYTHONPATH=/bd0a/lib/python3.9/site-packages (/usr is python's default site already)
 # The node does rclpy.init() + create_node(), prints the marker, shuts down.
 #
-# Python startup on the target is slow, so use a long timeout. If the USB dir was
-# not attached, ros2 run can't find the package; we SKIP rather than hang.
+# Python startup on the target is slow, so use a long timeout. If ros2 run can't
+# find the package, /bd0a was not mounted on the target: FAIL.
 proc test03-python-hello {} {
     test_header "SDK-toolkit Python hello (ament_python / rclpy self-test)"
 
@@ -34,7 +34,7 @@ proc test03-python-hello {} {
     expect {
         -re {Process 'python3'.*launched\.} { }
         -re {Package '?hello_python'? not found|No executable found for package|unable to find executable} {
-            test_skip "hello_python not present on /bd0a (run selftest-build.sh --lang python + boot with VX_USB)"
+            test_fail "hello_python not found on the target (is the VX_USB dir mounted as /bd0a?)"
         }
         timeout {
             send_ctrl_c

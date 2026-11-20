@@ -19,8 +19,8 @@ proc test02-rust-hello {} {
     expect {
         -exact {Hello from Rust, world!} {
         }
-        -re {Can't open file|No such file or directory|INSTANTIATE_FAILED} {
-            test_skip "/bd0a/lib/hello_rust/hello_rust not present (run selftest-build.sh --lang rust + boot with VX_USB)"
+        -re {Can't open file|No such file or directory|INSTANTIATE_FAILED|Cmd: '[^']*' not found} {
+            test_fail "/bd0a/lib/hello_rust/hello_rust not found on the target (is the VX_USB dir mounted as /bd0a?)"
         }
         timeout {
             test_fail "timed out waiting for the marker from hello_rust"
