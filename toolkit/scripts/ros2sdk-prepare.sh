@@ -71,20 +71,39 @@ mixin_arg() {
   "$PY" -c 'import json,sys; a=[x for x in json.load(open(sys.argv[1]))["build"]["vxworks"]["cmake-args"] if x.startswith(sys.argv[2])]; print(a[0].split("=",1)[1] if a else "")' "$VXMIXIN" "$1"
 }
 
-# relocate_files <old> <new> <file>...: replace the literal path <old> by <new>
-relocate_files() {
-  local old="$1" new="$2"; shift 2
-  local re; re="$(printf '%s' "$old" | sed 's/[][\\.*^$|]/\\&/g')"
-  [ $# -gt 0 ] || return 0
-  sed -i "s|${re}|${new}|g" "$@"
-}
+# The new paths (this toolkit's export/root, the SDK, its toolchain dir) are masked
+# while an old path is replaced or looked for: an old path can be part of a new one
+# (build SDK /wrsdk, user SDK /tmp/vanilla/wrsdk), and must not match inside it.
+SED_D=$'\001'                       # sed delimiter (paths may contain '|' or '#')
+lit_re() { printf '%s' "$1" | sed 's/[][\\.*^$|+?(){}]/\\&/g'; }   # literal -> ERE
+new_paths() { printf '%s\n' "$ROOT" "$WIND_SDK_HOME" "${NEW_TC:-}" "$TOOLKIT_DIR" | grep . | sort -u; }
+# mask_sed / unmask_sed: sed -E scripts that hide the new paths as \002<i>\003 and back
+mask_sed()   { local i=0 q; while IFS= read -r q; do i=$((i + 1)); printf 's%s%s%s\002%d\003%sg;' "$SED_D" "$(lit_re "$q")" "$SED_D" "$i" "$SED_D"; done < <(new_paths); }
+unmask_sed() { local i=0 q; while IFS= read -r q; do i=$((i + 1)); printf 's%s\002%d\003%s%s%sg;' "$SED_D" "$i" "$SED_D" "$q" "$SED_D"; done < <(new_paths); }
 
-# files_with <path> <file>...: those of <file>... that contain the literal <path>
-files_with() {
-  local p="$1"; shift
+# relocate_re <ERE> <new> <file>...: replace matches of <ERE> by <new>, outside the new paths
+relocate_re() {
+  local re="$1" new="$2"; shift 2
   [ $# -gt 0 ] || return 0
-  grep -lIF -- "$p" "$@" 2>/dev/null || true
+  sed -i -E "$(mask_sed)s${SED_D}${re}${SED_D}${new}${SED_D}g;$(unmask_sed)" "$@"
 }
+# relocate_files <old> <new> <file>...: replace the path <old> by <new>
+relocate_files() { local old="$1" new="$2"; shift 2; relocate_re "$(lit_re "$old")" "$new" "$@"; }
+
+# files_with_re <ERE> <file>...: those of <file>... with a match outside the new paths
+files_with_re() {
+  local re="$1" m f; shift
+  [ $# -gt 0 ] || return 0
+  m="$(mask_sed)"
+  for f in $(grep -lIE -- "$re" "$@" 2>/dev/null || true); do
+    sed -E "$m" "$f" | grep -qE -- "$re" && printf '%s\n' "$f"
+  done
+  return 0
+}
+# files_with <path> <file>...: those of <file>... that contain the path <path>
+files_with() { local re; re="$(lit_re "$1")"; shift; files_with_re "$re" "$@"; }
+# has_path <path> <file>: <file> contains the path <path>
+has_path() { [ -n "$(files_with "$1" "$2")" ]; }
 
 ros2_sdk_check() {
   [ -f "$ROOT/share/ament_cmake/cmake/ament_cmakeConfig.cmake" ] || die "ros2 sdk: export/root/ has no ament_cmake"
@@ -113,14 +132,14 @@ colcon_local_setup_relocate() {
     grep -q '_colcon_python_executable="/' "$f" && die "colcon local_setup: absolute python left in $f"
     if [ -n "$OLD_ROOT" ] && [ "$OLD_ROOT" != "$ROOT" ]; then
       relocate_files "$OLD_ROOT" "$ROOT" "$f"
-      grep -qF "$OLD_ROOT" "$f" && die "colcon local_setup: $OLD_ROOT left in $f"
+      has_path "$OLD_ROOT" "$f" && die "colcon local_setup: $OLD_ROOT left in $f"
     fi
   done
   # PowerShell (no ${WIND_SDK_HOME} expansion there): this SDK's absolute python
   f="$ROOT/local_setup.ps1"
   if [ -f "$f" ] && [ -n "$OLD_SDK" ] && [ "$OLD_SDK" != "$WIND_SDK_HOME" ]; then
     relocate_files "$OLD_SDK/$HOSTBIN_REL/python" "$WIND_SDK_HOME/$HOSTBIN_REL/python" "$f"
-    grep -qF "$OLD_SDK/$HOSTBIN_REL/python" "$f" && die "colcon local_setup: build python left in $f"
+    has_path "$OLD_SDK/$HOSTBIN_REL/python" "$f" && die "colcon local_setup: build python left in $f"
   fi
   log "colcon local_setup: python -> $py, prefix -> $ROOT"
 }
@@ -134,8 +153,8 @@ colcon_setup_relocate() {
   [ -n "$OLD_ROOT" ] && [ "$OLD_ROOT" != "$ROOT" ] || { log "colcon setup: nothing to relocate"; return 0; }
   for f in "$ROOT"/setup.sh "$ROOT"/setup.bash "$ROOT"/setup.zsh; do
     [ -f "$f" ] || continue
-    sed -i "s#${OLD_ROOT}#${ROOT}#g" "$f"
-    grep -qF "$OLD_ROOT" "$f" && die "colcon setup: $OLD_ROOT left in $f"
+    relocate_files "$OLD_ROOT" "$ROOT" "$f"
+    has_path "$OLD_ROOT" "$f" && die "colcon setup: $OLD_ROOT left in $f"
   done
   log "colcon setup: prefix chain -> $ROOT"
 }
@@ -179,7 +198,7 @@ ament_package_relocate() {
   local files fish="$ROOT/local_setup.fish"
   if [ -f "$fish" ] && [ -n "$OLD_SDK" ] && [ "$OLD_SDK" != "$WIND_SDK_HOME" ]; then
     relocate_files "$OLD_SDK/$HOSTBIN_REL/python" "$WIND_SDK_HOME/$HOSTBIN_REL/python" "$fish"
-    grep -qF "$OLD_SDK/$HOSTBIN_REL/python" "$fish" && die "ament_package: build python left in $fish"
+    has_path "$OLD_SDK/$HOSTBIN_REL/python" "$fish" && die "ament_package: build python left in $fish"
   fi
   [ -n "$OLD_ROOT" ] && [ "$OLD_ROOT" != "$ROOT" ] || { log "ament_package: nothing to relocate"; return 0; }
   mapfile -t files < <(files_with "$OLD_ROOT" "$fish" "$ROOT"/share/*/local_setup.* "$ROOT"/share/*/environment/*)
@@ -208,15 +227,15 @@ vxworks_mixin_relocate() {
   local m pair old new
   for m in "$MIXIN_DIR"/*.mixin; do
     [ -f "$m" ] || continue
-    [ -n "$OLD_TC" ]   && sed -i "s#${OLD_TC}#${NEW_TC}#g" "$m"
-    [ -n "$OLD_ROOT" ] && sed -i "s#${OLD_ROOT}#${ROOT}#g" "$m"
-    [ -n "$OLD_SDK" ] && [ "$OLD_SDK" != "$WIND_SDK_HOME" ] && sed -i "s#${OLD_SDK}#${WIND_SDK_HOME}#g" "$m"
+    [ -n "$OLD_TC" ]   && relocate_files "$OLD_TC" "$NEW_TC" "$m"
+    [ -n "$OLD_ROOT" ] && relocate_files "$OLD_ROOT" "$ROOT" "$m"
+    [ -n "$OLD_SDK" ] && [ "$OLD_SDK" != "$WIND_SDK_HOME" ] && relocate_files "$OLD_SDK" "$WIND_SDK_HOME" "$m"
   done
   # each baked path against its own new path (equal on a re-run: already relocated);
   # OLD_SDK is not checked: it may equal the new SDK root
   for pair in "${OLD_ROOT}|$ROOT" "${OLD_TC}|$NEW_TC"; do
     old="${pair%%|*}"; new="${pair#*|}"
-    [ -n "$old" ] && [ "$old" != "$new" ] && grep -qF "$old" "$VXMIXIN" && \
+    [ -n "$old" ] && [ "$old" != "$new" ] && has_path "$old" "$VXMIXIN" && \
       die "vxworks mixin: un-relocated build path left: $old"
   done
   "$PY" -c "import json,sys; json.load(open(sys.argv[1]))" "$VXMIXIN" || die "vxworks mixin: not valid JSON"
@@ -249,10 +268,11 @@ ament_vendor_hooks_relocate() {
 ament_vendor_prefix_relocate() {
   local files f re n=0
   [ -n "$OLD_TOP" ] || { log "ament_vendor prefix: no build output dir known (nothing to relocate)"; return 0; }
-  re="$(printf '%s' "$OLD_TOP" | sed 's/[][\\.*^$|+?(){}]/\\&/g')/build/[^\"' :;]*/build/[^/\"' :;]*/[^/\"' :;]*_install"
-  mapfile -t files < <(grep -rlIE -- "$re" "$ROOT" 2>/dev/null || true)
-  for f in "${files[@]}"; do sed -i -E "s|${re}|${ROOT}|g" "$f"; n=$((n + 1)); done
-  [ -z "$(grep -rlIE -- "$re" "$ROOT" 2>/dev/null)" ] || die "ament_vendor prefix: staging prefix left under $ROOT"
+  re="$(lit_re "$OLD_TOP")/build/[^\"' :;]*/build/[^/\"' :;]*/[^/\"' :;]*_install"
+  mapfile -t files < <(files_with_re "$re" $(grep -rlIE -- "$re" "$ROOT" 2>/dev/null || true))
+  n=${#files[@]}
+  relocate_re "$re" "$ROOT" "${files[@]}"
+  [ -z "$(files_with_re "$re" "${files[@]}")" ] || die "ament_vendor prefix: staging prefix left under $ROOT"
   log "ament_vendor prefix: $n file(s) -> $ROOT"
 }
 
@@ -284,7 +304,7 @@ export_root_check() {
   for p in "$OLD_ROOT" "$OLD_TOP" "$OLD_SDK"; do
     [ -n "$p" ] && [ "$p" != "$ROOT" ] && [ "$p" != "$WIND_SDK_HOME" ] || continue
     [ "$p" = "$OLD_TOP" ] && [ "${ROOT#"$OLD_TOP"/}" != "$ROOT" ] && continue
-    left="$(grep -rlIF -- "$p" "$ROOT" 2>/dev/null || true)"
+    left="$(files_with "$p" $(grep -rlIF -- "$p" "$ROOT" 2>/dev/null || true))"
     [ -z "$left" ] && continue
     log "export/root: WARN: $(printf '%s\n' "$left" | wc -l) file(s) still contain $p, e.g.:"
     printf '%s\n' "$left" | head -5 | sed "s|^$ROOT/|   |"
