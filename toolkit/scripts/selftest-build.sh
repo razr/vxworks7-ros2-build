@@ -17,7 +17,7 @@
 #   5) assert each compiled artifact (cpp/rust) is a VxWorks (x86-64, ld64.so.1) RTP
 #   6) Python: optimize-python-startup on install/ (unchecked-hash .pyc + launchers)
 #   7) stage the merged install/ tree onto the USB dir (-> /bd0a); the matching
-#      on-target proc (test09/test10/test11) runs it from /bd0a. ros2.img untouched.
+#      on-target proc (tests/toolkit/test01..03) runs it from /bd0a. ros2.img untouched.
 #
 # Usage:
 #   selftest-build.sh [--toolkit <tarball-or-dir>] [--sdk <wrsdk-dir>] [--img <ros2.img>]
@@ -34,7 +34,7 @@
 #
 # After this succeeds, boot the image and run the on-target assertion (the script
 # prints the exact command, with the absolute path to tests/main_script.exp):
-#   expect <build-tree>/tests/main_script.exp <ros2.img> test09-toolkit-hello
+#   expect <build-tree>/tests/main_script.exp <ros2.img> toolkit/test01-cpp-hello
 #
 # Exit 0 = toolkit built a VxWorks RTP and it is now in the image.
 set -euo pipefail
@@ -321,12 +321,12 @@ esac
 say "7) stage merged install/ -> USB dir $USB_DIR (-> /bd0a; ros2.img untouched)"
 cp -a "$INSTALL/." "$USB_DIR/" || die "staging merged install/ to USB failed"
 
-# Map lang -> on-target test proc by naming (tests/test*-toolkit-<lang>-*.exp), the
-# same convention tests/main_script.exp uses to skip toolkit tests without VX_USB.
+# Map lang -> on-target test by naming (tests/toolkit/test*-<lang>-*.exp), as the
+# selector main_script.exp takes: toolkit/<test>.
 test_for() {
-  local t; t="$(ls "$BUILD_TREE"/tests/test*-toolkit-"$1"-*.exp 2>/dev/null | head -1)"
-  [ -n "$t" ] || die "no on-target test tests/test*-toolkit-$1-*.exp for --lang $1"
-  basename "$t" .exp
+  local t; t="$(ls "$BUILD_TREE"/tests/toolkit/test*-"$1"-*.exp 2>/dev/null | head -1)"
+  [ -n "$t" ] || die "no on-target test tests/toolkit/test*-$1-*.exp for --lang $1"
+  echo "toolkit/$(basename "$t" .exp)"
 }
 
 # Print the copy-pasteable on-target command. The harness attaches the USB dir via

@@ -1,4 +1,4 @@
-# test10-toolkit-rust-hello - on-target half of the SDK-toolkit self-test (Rust).
+# test02-rust-hello - on-target half of the SDK-toolkit self-test (Rust).
 #
 # The HOST half (toolkit/scripts/selftest-build.sh --lang rust) cross-built an
 # ament_cargo rclrs node for VxWorks and staged it on a USB dir attached as /bd0a
@@ -7,7 +7,7 @@
 # Merged install puts the binary at /bd0a/lib/hello_rust/hello_rust.
 #
 # If the USB dir was not attached, the binary is absent; we SKIP rather than hang.
-proc test10-toolkit-rust-hello {} {
+proc test02-rust-hello {} {
     test_header "SDK-toolkit Rust hello (rclrs toolkit self-test)"
 
     # Point the loader + ament index at /bd0a (plus the baked /usr base). The rclrs

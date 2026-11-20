@@ -140,7 +140,7 @@ SDK (`CARGO_HOME`, set when you source the SDK env).
 
 Builds+deploys a hello-world per language into `ros2.img` and prints the
 `expect …/tests/main_script.exp <img> …` command for the on-target checks
-(`test09`/`test10`/`test11`). Keeps the work dir by default; `--clean` removes it.
+(`tests/toolkit/test01`..`test03`). Keeps the work dir by default; `--clean` removes it.
 
 ## Run your app on VxWorks/QEMU
 

@@ -1,4 +1,4 @@
-# test09-toolkit-cpp-hello - on-target half of the SDK-toolkit self-test (C++).
+# test01-cpp-hello - on-target half of the SDK-toolkit self-test (C++).
 #
 # The HOST half (toolkit/scripts/selftest-build.sh --lang cpp) cross-built an
 # ament_cmake node for VxWorks and staged it on a USB dir attached as /bd0a (via
@@ -7,7 +7,7 @@
 #
 # If the USB dir was not attached (VX_USB unset) the binary is absent; we detect
 # that and SKIP rather than hang, so a normal image run of the suite is unaffected.
-proc test09-toolkit-cpp-hello {} {
+proc test01-cpp-hello {} {
     test_header "SDK-toolkit C++ hello (toolkit self-test)"
 
     # Point the loader + ament index at /bd0a (plus the baked /usr base). A

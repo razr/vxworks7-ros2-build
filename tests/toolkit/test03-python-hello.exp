@@ -1,4 +1,4 @@
-# test11-toolkit-python-hello - on-target half of the SDK-toolkit self-test (Python).
+# test03-python-hello - on-target half of the SDK-toolkit self-test (Python).
 #
 # The HOST half (toolkit/scripts/selftest-build.sh --lang python) built an
 # ament_python package (hello_python), converted its console-script shim with
@@ -6,7 +6,7 @@
 # the main build applies), and staged the merged install tree on a USB dir
 # attached as /bd0a (via VX_USB) -- ros2.img is NOT modified.
 #
-# We run it via `ros2 run` (like the baked-in Python tests, e.g. test03). The
+# We run it via `ros2 run` (like the baked-in Python tests, e.g. ros2/test03). The
 # converted wrapper uses importlib.metadata, which re-scans sys.path live. Three
 # env vars make a /bd0a-relocated package resolvable (verified on target):
 #   AMENT_PREFIX_PATH=/usr:/bd0a                 (/usr FIRST: base ROS 2 ament index)
@@ -16,7 +16,7 @@
 #
 # Python startup on the target is slow, so use a long timeout. If the USB dir was
 # not attached, ros2 run can't find the package; we SKIP rather than hang.
-proc test11-toolkit-python-hello {} {
+proc test03-python-hello {} {
     test_header "SDK-toolkit Python hello (ament_python / rclpy self-test)"
 
     set timeout 600

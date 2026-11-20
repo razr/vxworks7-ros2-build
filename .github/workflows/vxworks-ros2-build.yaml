@@ -325,7 +325,7 @@ jobs:
           # downloaded image is at ./output/ros2.img (the Makefile canonical
           # location); pass it explicitly to main_script.exp (default ./ros2.img).
           echo "Running tests..."
-          ./tests/main_script.exp output/ros2.img
+          ./tests/main_script.exp output/ros2.img ros2
 
   # The toolkit self-test, split by host: the samples are built with the SDK's
   # host tools (vxsdk/host/x86_64-linux), so on x86; they are run on QEMU on the
@@ -443,6 +443,6 @@ jobs:
           cd ${{ github.workspace }}
           [ "$SDK" = "raspberrypi4b" ] && export VX_TARGET=rpi4
           mkdir -p selftest && tar --zstd -C selftest -xf toolkit-selftest.tar.zst
-          . selftest/tests.env      # VX_TESTS: test*-toolkit-<lang>-*
+          . selftest/tests.env      # VX_TESTS: toolkit/test*-<lang>-*
           echo "VX_USB=$PWD/selftest/usb  image=$PWD/selftest/ros2.img  TESTS=$VX_TESTS"
           VX_USB="$PWD/selftest/usb" ./tests/main_script.exp "$PWD/selftest/ros2.img" $VX_TESTS

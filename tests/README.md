@@ -6,16 +6,28 @@ This directory contains automated Expect-based test scripts for verifying ROS 2 
 
 ```bash
 /tests
-├── main_script.exp # Main entry point: launches QEMU, boots VxWorks, and runs all tests
-├── test01-env.exp # Test: Validate environment setup
-├── test02-timer_lambda.exp # Test: C++ timer lambda execution
-├── test03-timer_lambda_py.exp # Test: Python timer lambda execution
-├── test04-talker.exp # Test: C++ talker/listener (Fast-DDS, shared memory)
-├── test05-sros2.exp # Test: SROS 2 security functionality (skips if no keystore)
-├── test06-rclrs.exp # Test: Rust rclrs pub/sub (Fast-DDS, shared memory)
-├── test07-talker-udpv4.exp # Test: C++ talker/listener (Fast-DDS, UDPv4 transport)
-└── test08-talker-cyclonedds.exp # Test: C++ talker/listener (CycloneDDS RMW, loopback)
+├── main_script.exp   # Entry point: boots VxWorks in QEMU, runs the selected suites/tests
+├── lib/              # Expect libraries (vxworks, qemu, telnet)
+├── ros2/             # suite: ROS 2 nodes from the image (default)
+│   ├── test01-env.exp                # Validate environment setup
+│   ├── test02-timer_lambda.exp       # C++ timer lambda execution
+│   ├── test03-timer_lambda_py.exp    # Python timer lambda execution
+│   ├── test04-talker.exp             # C++ talker/listener (Fast-DDS, shared memory)
+│   ├── test05-sros2.exp              # SROS 2 security (skips if no keystore)
+│   ├── test06-rclrs.exp              # Rust rclrs pub/sub (Fast-DDS, shared memory)
+│   ├── test07-talker-udpv4.exp       # C++ talker/listener (Fast-DDS, UDPv4)
+│   └── test08-talker-cyclonedds.exp  # C++ talker/listener (CycloneDDS, loopback)
+├── toolkit/          # suite: nodes the SDK toolkit built (needs VX_USB, /bd0a)
+│   ├── test01-cpp-hello.exp
+│   ├── test02-rust-hello.exp
+│   └── test03-python-hello.exp
+└── unixextra/        # suite: unixextra C function tests (needs VX_USB, /bd0a)
+    └── test01-functions.exp          # runs every *_test binary in VX_USB
 ```
+
+Each suite numbers its tests from 01. The tables below describe the `ros2` suite;
+`toolkit` is produced by `toolkit/scripts/selftest-build.sh`, `unixextra` by
+`pkg/unixextra` (`flock`, `posix_fallocate`, `socketpair`, `vdprintf`).
 
 ## Tests
 
@@ -58,19 +70,20 @@ sudo ip link set tap0 up
 ## Usage
 
 ```bash
-./main_script.exp [<ros2.img>] [test ...]
+./main_script.exp [<ros2.img>] [<suite>|<suite>/<test> ...]
 ```
 
 - `<ros2.img>` — image path (default `./ros2.img`).
-- `test ...` — one or more test names to run (default: **all**). A test name is any
-  argument starting with `test`, with or without the `.exp` suffix; anything else is
-  treated as the image path.
+- `<suite>` — a directory under `tests/` (`ros2` is the default); runs all its tests.
+- `<suite>/<test>` — one test, with or without `.exp`. Anything else is the image path.
+- `toolkit` and `unixextra` need `VX_USB=<dir>`, a host dir attached as `/bd0a`
+  that holds the binaries; without it the script exits with an error.
 
 ```bash
-./main_script.exp ros2.img                          # all tests
-./main_script.exp ros2.img test06-rclrs             # just one test
-./main_script.exp ros2.img test04-talker test06-rclrs   # a subset
-./main_script.exp test08-talker-cyclonedds          # default image, one test
+./main_script.exp ros2.img                               # the ros2 suite
+./main_script.exp ros2.img ros2/test06-rclrs             # just one test
+./main_script.exp ros2.img ros2/test04-talker ros2/test06-rclrs   # a subset
+VX_USB=<dir> ./main_script.exp ros2.img unixextra        # the unixextra suite
 ```
 
 To see usage instructions:
@@ -97,7 +110,7 @@ tuned per target and controlled by these env vars:
 
 ```bash
 source /path/to/wrsdk-vxworks7-qemu/sdkenv.sh
-./tests/main_script.exp output/ros2.img
+./tests/main_script.exp output/ros2.img ros2
 ```
 
 **aarch64 / raspi4b** — needs a QEMU with the BCM2838 GENET + SD→emmc2 model
@@ -116,7 +129,7 @@ Run a single test (recommended on raspi4, since TCG boot is slow):
 
 ```bash
 VX_QEMU=/path/to/patched/qemu-system-aarch64 \
-  ./tests/main_script.exp output-rpi-4/ros2.img test02-timer_lambda
+  ./tests/main_script.exp output-rpi-4/ros2.img ros2/test02-timer_lambda
 ```
 
 The raspi4 boot line is passed via QEMU `-append` (lands in the dtb `/chosen/bootargs`,
@@ -126,7 +139,7 @@ which VxWorks reads via `vxFdtBootargsGet`) — the stock SDK dtb is used unmodi
 
 - `main_script.exp` launches `QEMU` with the ROS 2 image and VxWorks kernel.
 - Once the `->` shell prompt is detected, it:
-  - Dynamically sources all test scripts named `test*.exp`.
+  - Sources the `test*.exp` scripts of the selected suites, in order.
   - Automatically detects and runs all procedures starting with test.
   - Sends necessary keystrokes and awaits test completion markers.
   - Exits QEMU via `Ctrl-A x` after all tests run.
