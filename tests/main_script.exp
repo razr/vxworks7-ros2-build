@@ -52,6 +52,9 @@ proc run_tests {test_scripts} {
                 # running in the foreground of the serial console.
                 qemu::send_ctrl_c
             }
+            # Close the telnet sessions a failed test left open (with its node
+            # still running there), so the next test starts with none.
+            telnet::close_all
             # Back to the serial console: a test may have left the telnet spawn
             # as the implicit channel.
             set spawn_id $qemu::spawn_id
