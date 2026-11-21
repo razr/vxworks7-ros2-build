@@ -31,7 +31,7 @@ on:
           - lyrical
 
 jobs:
-  build:
+  vxros2build:
     runs-on: ubuntu-24.04
     services:
       registry:

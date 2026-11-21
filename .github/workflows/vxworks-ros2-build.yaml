@@ -286,7 +286,7 @@ jobs:
           name: ros2-vxworks-toolkit ${{ needs.build.outputs.sdk }} ${{ needs.build.outputs.ros_distro }}
           path: ${{ github.workspace }}/output/toolkit-*.tar.*
 
-  test:
+  ros2-test:
     # raspberrypi4b: boot the aarch64 target on an arm64 host; x86 SDKs on amd64
     runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     needs: build
@@ -329,7 +329,7 @@ jobs:
 
   # The toolkit self-test, split by host: the samples are built with the SDK's
   # host tools (vxsdk/host/x86_64-linux), so on x86; they are run on QEMU on the
-  # runner that matches the target (aarch64 raspi4b on arm64, like the test job).
+  # runner that matches the target (aarch64 raspi4b on arm64, like the ros2-test job).
   toolkit-selftest:
     runs-on: ubuntu-24.04
     needs: [build, toolkit]
@@ -411,7 +411,7 @@ jobs:
           path: ${{ github.workspace }}/toolkit-selftest.tar.zst
 
   toolkit-test:
-    # same host choice as the test job
+    # same host choice as the ros2-test job
     runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     needs: [build, toolkit-selftest]
     if: ${{ inputs.test && inputs.toolkit }}
