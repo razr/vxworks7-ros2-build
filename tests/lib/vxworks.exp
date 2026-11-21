@@ -89,6 +89,13 @@ namespace eval vxworks {
     # before the marker was seen 'count' times.
     proc run_node {id cmd marker {count 5}} {
         send_cmd $id "$cmd"
+        run_node_wait $id $marker $count
+    }
+
+    # Wait for a running node's marker 'count' more times, with the same failure
+    # rules as run_node (timeout, closed console, abort/crash). Use it to check a
+    # second marker of a node run_node already started.
+    proc run_node_wait {id marker {count 5}} {
         for {set i 0} {$i < $count} {incr i} {
             expect -i $id \
                 -exact $marker {} \
