@@ -9,7 +9,6 @@
 # two participants succeeded. So "I heard" proves secure communication.
 proc test05-sros2 {} {
     test_header "SROS2 secure pub/sub (talker + listener)"
-    set timeout 600
 
     # Check for ca.cert.pem, otherwise skip. Note: VxWorks 'ls' on a missing
     # path prints  Can't open "<path>".  (not the Linux "No such file or
@@ -27,9 +26,19 @@ proc test05-sros2 {} {
     }
 
     # Talker on the serial console. Security env is per-RTP: set it on both
-    # consoles.
+    # consoles. Whatever happens, security is switched off again on the serial
+    # console afterwards, so a failure does not leak into the next tests.
     vxworks::set_env $qemu::spawn_id "ROS_SECURITY_ENABLE=true"
     vxworks::set_env $qemu::spawn_id "ROS_SECURITY_STRATEGY=Enforce"
+    set code [catch {sros2_pubsub} err opts]
+    vxworks::set_env $qemu::spawn_id "ROS_SECURITY_ENABLE=false"
+    vxworks::set_env $qemu::spawn_id "ROS_SECURITY_STRATEGY="
+    return -options $opts $err
+}
+
+# The secure talker (serial) + listener (telnet) of test05-sros2. Its name
+# does not start with "test", so main_script does not run it as a test.
+proc sros2_pubsub {} {
     vxworks::run_node $qemu::spawn_id \
         "python3 ros2 run demo_nodes_cpp talker --ros-args --enclave /talker_listener/talker" \
         "Found security directory" 1
@@ -46,11 +55,16 @@ proc test05-sros2 {} {
     vxworks::run_node $tid \
         "/usr/lib/demo_nodes_cpp/listener --ros-args --enclave /talker_listener/listener" \
         "Found security directory" 1
-    vxworks::run_node_wait $tid "I heard" 3
+    # The secure DDS handshake (RSA/ECDSA) is slow under TCG: on raspi4b the
+    # first sample came ~5 min after the listener started. vxworks::run_node_wait
+    # waits with the global timeout, so raise that one for this wait only.
+    set saved $::timeout
+    if {[qemu::target] eq "rpi4"} { set ::timeout 900 }
+    set code [catch {vxworks::run_node_wait $tid "I heard" 3} err opts]
+    set ::timeout $saved
+    if {$code} { return -options $opts $err }
     telnet::close $tid
 
     # Stop the talker (the RTP is gone after Ctrl-C; nothing to delete).
     send_ctrl_c
-    vxworks::set_env $qemu::spawn_id "ROS_SECURITY_ENABLE=false"
-    vxworks::set_env $qemu::spawn_id "ROS_SECURITY_STRATEGY="
 }
