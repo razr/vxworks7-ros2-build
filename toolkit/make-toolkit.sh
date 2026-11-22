@@ -75,6 +75,15 @@ if [ -f "$RUST_TMPL" ]; then
   log "   staged rust-cargo-config.toml.template (Rust/rclrs support)"
 fi
 
+# vxworks colcon mixin template: the build's CMake arguments with their paths as
+# variables (ROOT_DIR, VX_CROSS_CMAKE_TOOLCHAINFILE, WIND_SDK_HOST_TOOLS, Python_*), so
+# a consumer outside this toolkit's layout (e.g. a Debian build) renders it with
+# envsubst for its own paths. The rendered copy is export/root/.colcon/mixin/default/.
+MIXIN_TMPL="$PACKAGE_DIR/ros2/files/$ROS_DISTRO/vxworks.mixin.template"
+[ -f "$MIXIN_TMPL" ] || die "vxworks.mixin.template missing: $MIXIN_TMPL"
+install -D -m0644 "$MIXIN_TMPL" "$STAGE/scripts/vxworks.mixin.template"
+log "   staged vxworks.mixin.template"
+
 # --- 4) manifest.json (keys == Makefile vars) + layer pin + build commit ----
 log "4) manifest.json"
 PKGMK="$PACKAGE_DIR/ros2/files/$ROS_DISTRO/packages.mk"

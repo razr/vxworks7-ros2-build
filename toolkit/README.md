@@ -40,6 +40,7 @@ All paths in this document are relative to that toolkit root.
 | `scripts/run-qemu.sh` | boot `ros2.img`; `--usb <dir>` attaches your binary as `/bd0a` |
 | `scripts/extract-deploy.sh` / `make-image.sh` | extract / rebuild `ros2.img` |
 | `scripts/generate-manifest.py` | (re)generate `manifest.json` |
+| `scripts/vxworks.mixin.template` | the `vxworks` mixin with its paths as variables, for builds outside this toolkit's layout (render with `envsubst`) |
 | `tests/` | the on-target tests (Expect, on QEMU): `main_script.exp`, `lib/`, suites `ros2` (the image), `toolkit` (the self-test nodes), `unixextra` |
 | `.vscode/tasks.json` | VS Code tasks: colcon build, run on QEMU |
 | `manifest.json` | what was built and how it is tested: distro, VxWorks release, arch, layer pin, package/patch/ignore lists, QEMU |
@@ -153,7 +154,7 @@ build's Makefile variables:
 | `ROS2_PATCH_DIRS` | the packages patched from the layer |
 | `ROS2_VENDORS`, `ROS2_BASE`, `ROS2_EXAMPLES`, `ROS2_RUST` | what is built: the vendors first, then the rest |
 | `ROS_IGNORE_DIRS`, `ROS_IGNORE_TESTING_DIRS`, `ROS_IGNORE_PYTHON_DIRS` | what is not built |
-| `ROS2_MIXINS`, `ROS2_RUST_TARGET` | how it is built (the mixins are in `export/root/.colcon/mixin/default/`) |
+| `ROS2_MIXINS`, `ROS2_RUST_TARGET` | how it is built: the mixins, rendered for this toolkit in `export/root/.colcon/mixin/default/` (by `ros2sdk-prepare.sh`); `scripts/vxworks.mixin.template` is the `vxworks` one with its paths as variables (`ROOT_DIR`, `VX_CROSS_CMAKE_TOOLCHAINFILE` = `$WIND_CC_SYSROOT/mk/toolchain.cmake` in an overlaid SDK, `WIND_SDK_HOST_TOOLS`, `Python_*`) |
 | `qemu` | the QEMU the image is tested with: `QEMU_REPO`, `QEMU_RELEASE` (`host` = the host's distro QEMU), `QEMU_BIN` |
 
 ## License

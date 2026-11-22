@@ -8,7 +8,7 @@
                 "-DCMAKE_CXX_STANDARD=17",
                 "-DCMAKE_CXX_STANDARD_REQUIRED=ON",
                 "-DCMAKE_VERBOSE_MAKEFILE:BOOL=ON",
-                "-DCMAKE_TOOLCHAIN_FILE=${BUILDSPECS_DIR}/cmake/toolchain.cmake",
+                "-DCMAKE_TOOLCHAIN_FILE=${VX_CROSS_CMAKE_TOOLCHAINFILE}",
                 "-DCMAKE_MAKE_PROGRAM:FILEPATH=${WIND_SDK_HOST_TOOLS}/x86_64-linux/bin/make",
                 "-DPython3_EXECUTABLE=${WIND_SDK_HOST_TOOLS}/x86_64-linux/bin/python3",
                 "-DPython_ROOT_DIR=/usr/3pp/develop/usr/",

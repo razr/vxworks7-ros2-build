@@ -129,7 +129,8 @@ ros2.configure: ros2.patch
 	$(call ros2_ignore,$(ROS_IGNORE_DIRS))
 	mkdir -p $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon/mixin/default;
 	cp files/$(ROS_DISTRO)/*.mixin $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon/mixin/default/.;
-	envsubst < files/$(ROS_DISTRO)/vxworks.mixin.template > $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon/mixin/default/vxworks.mixin
+	VX_CROSS_CMAKE_TOOLCHAINFILE=$(VX_CROSS_CMAKE_TOOLCHAINFILE) \
+	  envsubst < files/$(ROS_DISTRO)/vxworks.mixin.template > $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon/mixin/default/vxworks.mixin
 	# Rust (rclrs) cross-build support (ROS 2 specific). The VxWorks Rust toolchain
 	# fixes (patched libloading under $(WIND_CC_SYSROOT)/usr/rust/vxworks-crates, and
 	# the patched cargo-ament-build) are delivered by pkg/sdk. Here we only generate
