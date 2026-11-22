@@ -10,7 +10,8 @@ A prebuilt ROS 2 SDK for VxWorks 7 (`export/root/`), a bootable target image
 (`ros2.img`), scripts and on-target tests. The user builds their own ROS 2
 packages against it; ROS 2 itself is not rebuilt. Applications run on VxWorks
 as user-space processes (RTPs). See `manifest.json` for the ROS 2 distro,
-VxWorks release and target architecture.
+VxWorks release, target architecture and the QEMU the image is tested with
+(`qemu`).
 
 ## Build
 

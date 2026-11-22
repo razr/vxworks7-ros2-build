@@ -287,14 +287,18 @@ sudo tunctl -u $USER -t tap0
 sudo ifconfig tap0 192.168.200.254 up
 ```
 
-The VxWorks ROS 2 build is tested with
+The QEMU each target is tested with is set per VxWorks release in
+`pkg/sdk/files/<release>/defs.sdk.mk`, per target arch: `QEMU_REPO_<arch>` (the
+full repo), `QEMU_RELEASE_<arch>` (a release in it, or `host` for the host's
+distro QEMU) and `QEMU_BIN` (`qemu-system-<arch>`). For 26.03:
 
-```bash
-$ sudo apt-get install qemu-system
-$ qemu-system-x86_64 --version
-QEMU emulator version 8.2.2 (Debian 1:8.2.2+ds-0ubuntu1.16)
-Copyright (c) 2003-2023 Fabrice Bellard and the QEMU Project developers
-```
+| Target | QEMU |
+|--------|------|
+| x86_64 | the host's distro QEMU (`sudo apt-get install qemu-system-x86`) |
+| aarch64 (raspi4b) | `qemu-system-aarch64-raspi4` from https://github.com/razr/qemu-raspi4-deb release `v11.1.91-raspi4genet4` (stock QEMU cannot boot it) |
+
+`make qemu-env` writes the values for the sourced SDK to `output/qemu.env`; the CI
+`setup-qemu` action installs from it, and the toolkit's `manifest.json` records it.
 
 A filesystem with ROS 2 artifacts needs to be prepared to boot with VxWorks.
 

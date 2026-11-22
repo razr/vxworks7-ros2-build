@@ -124,8 +124,8 @@ packages, your own patches or another SDK.
 | VxWorks SDKs | qemu x86_64: `<wrsdk-vxworks7-qemu-x.y.z>`; raspberrypi4b aarch64: `<wrsdk-vxworks7-raspberrypi4b-x.y.z>` |
 | ROS 2 layer | `vxworks7-layer-for-ros2` tag `<tag>` = branch `<distro>-release-<vxworks release>` @ `<layer commit>` |
 | Build container | Ubuntu `<ubuntu>` (`Docker/<ubuntu>/`) |
-| QEMU (x86_64 tests) | distro `qemu-system-x86` `<x.y.z>` of the CI runner (version printed in the `setup-qemu` step of the CI run) |
-| QEMU (raspi4b tests) | `razr/qemu-raspi4-deb` `<qemu release>` (from `razr/qemu` `raspi4b-vxworks` @ `<qemu commit>`) |
+| QEMU (x86_64 tests) | `QEMU_RELEASE_x86_64` = `host`: distro `qemu-system-x86` `<x.y.z>` of the CI runner (version printed in the `setup-qemu` step of the CI run) |
+| QEMU (raspi4b tests) | `QEMU_RELEASE_aarch64`: `razr/qemu-raspi4-deb` `<qemu release>` (from `razr/qemu` `raspi4b-vxworks` @ `<qemu commit>`) |
 | CI run | `<run url>` |
 
 ## Requirements

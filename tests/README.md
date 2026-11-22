@@ -52,7 +52,9 @@ the talker publishes but the listener stays silent.
 ## Prerequisites
 
 - QEMU (`qemu-system-x86_64` for x86; a GENET+SD-patched `qemu-system-aarch64` for
-  raspi4b — see *Targets* below)
+  raspi4b — see *Targets* below). Which QEMU a release is tested with is set in
+  `pkg/sdk/files/<release>/defs.sdk.mk` (`QEMU_REPO_<arch>`, `QEMU_RELEASE_<arch>`);
+  `make qemu-env` prints it for the sourced SDK.
 - A valid `ros2.img` disk image in the current directory or passed as an argument
 - VxWorks kernel image available at `$WIND_SDK_HOME/vxsdk/bsps/**/vxWorks` (x86) or
   `**/uVxWorks` (raspi4b)

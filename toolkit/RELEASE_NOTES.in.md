@@ -6,8 +6,9 @@
 
 - The Wind River VxWorks SDK matching the identity above (not shipped): download it
   from https://labs.windriver.com/vxworks-sdk/.
-- QEMU: `qemu-system-x86_64` for x86_64; for aarch64 (raspi4b) the patched
-  `qemu-system-aarch64-raspi4` from `razr/qemu-raspi4-deb` (stock QEMU cannot boot it).
+- QEMU: the one in `manifest.json` `qemu`: `QEMU_BIN` from `QEMU_REPO` release
+  `QEMU_RELEASE` (`host` = your distro's QEMU). For aarch64 (raspi4b) that is the
+  patched `qemu-system-aarch64-raspi4` (stock QEMU cannot boot it).
 - `tap0` up at `192.168.200.254/24` for the target network (root, set up once; see
   `README.md`).
 - `zstd`, `mtools`, `dosfstools` on the host.

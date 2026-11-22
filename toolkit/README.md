@@ -42,7 +42,7 @@ All paths in this document are relative to that toolkit root.
 | `scripts/generate-manifest.py` | (re)generate `manifest.json` |
 | `tests/` | the on-target tests (Expect, on QEMU): `main_script.exp`, `lib/`, suites `ros2` (the image), `toolkit` (the self-test nodes), `unixextra` |
 | `.vscode/tasks.json` | VS Code tasks: colcon build, run on QEMU |
-| `manifest.json` | what was built: distro, VxWorks release, arch, layer pin, package/patch/ignore lists |
+| `manifest.json` | what was built and how it is tested: distro, VxWorks release, arch, layer pin, package/patch/ignore lists, QEMU |
 | `AGENTS.md` | instructions for AI coding assistants (Codex, Copilot, Cursor, Claude Code, Kiro, …) |
 
 ## Quick start
@@ -142,11 +142,19 @@ Quit QEMU with `Ctrl-A x`.
 
 ## Provenance / reproducibility
 
-`manifest.json` records the ROS distro, VxWorks release, arch, the
-`vxworks7-layer-for-ros2` layer (url + branch + commit), and the exact package /
-patch / ignore lists (keys mirror the build's Makefile variables:
-`ROS2_PATCH_DIRS`, `ROS_IGNORE_*`, `ROS2_BASE`, `ROS2_EXAMPLES`, `ROS2_RUST`,
-`ROS2_MIXINS`).
+`manifest.json` describes the build this toolkit comes from. Its keys mirror the
+build's Makefile variables:
+
+| Key | What |
+|-----|------|
+| `ros_distro`, `vxworks_release`, `vxworks_sdk`, `arch` | the ROS 2 distro and the SDK it is built against |
+| `build` | the `vxworks7-ros2-build` commit (`commit`, `describe`) |
+| `layer` | the `vxworks7-layer-for-ros2` layer: `PKG_LAYER_URL`, `PKG_LAYER_COMMIT_ID` (branch), `commit` |
+| `ROS2_PATCH_DIRS` | the packages patched from the layer |
+| `ROS2_VENDORS`, `ROS2_BASE`, `ROS2_EXAMPLES`, `ROS2_RUST` | what is built: the vendors first, then the rest |
+| `ROS_IGNORE_DIRS`, `ROS_IGNORE_TESTING_DIRS`, `ROS_IGNORE_PYTHON_DIRS` | what is not built |
+| `ROS2_MIXINS`, `ROS2_RUST_TARGET` | how it is built (the mixins are in `export/root/.colcon/mixin/default/`) |
+| `qemu` | the QEMU the image is tested with: `QEMU_REPO`, `QEMU_RELEASE` (`host` = the host's distro QEMU), `QEMU_BIN` |
 
 ## License
 
