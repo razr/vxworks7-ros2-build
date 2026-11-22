@@ -33,7 +33,7 @@ DEFAULT_BUILD ?= sdk unixextra ros2
 endif
 endif
 
-.PHONY: examples image fs sdk-overlay toolkit info
+.PHONY: examples image fs sdk-overlay toolkit info qemu-env
 
 all: $(DOWNLOADS_DIR) $(STAMP_DIR) $(EXPORT_DIR)
 	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.install || exit 1; done;
@@ -58,6 +58,12 @@ $(SDK_OVERLAY_STAGE)/install-sdk-overlay.sh:
 # image - pack the bootable FAT32 ros2.img (defs.image.mk::build_fs).
 image: fs $(ROS2_IMG)
 
+# qemu-env - record the QEMU the image is tested with: $(QEMU_ENV), from the
+# release's defs.sdk.mk (pkg/sdk sdk.get-qemu).
+qemu-env:
+	@mkdir -p $(dir $(QEMU_ENV))
+	$(MAKE) -s --no-print-directory -C pkg/sdk sdk.get-qemu > $(QEMU_ENV)
+	@cat $(QEMU_ENV)
 # toolkit - assemble the ROS 2 VxWorks SDK delivery kit (defs.toolkit.mk::build_toolkit).
 toolkit: $(SDK_OVERLAY_STAGE)/install-sdk-overlay.sh
 	$(call build_toolkit)

@@ -47,10 +47,11 @@ TOOLKIT_LAYER_COMMIT    ?=
 .PHONY: toolkit-clean toolkit-info
 
 # build_toolkit - run the kit assembler (make-toolkit.sh) with the build vars in
-# its environment. No args. Consumes export/root, export/deploy, ros2.img.
+# its environment. No args. Consumes export/root, export/deploy, ros2.img,
+# qemu.env.
 define build_toolkit
 	@$(ECHO) "📦 Assembling ROS 2 VxWorks SDK toolkit: $(TOOLKIT_NAME)"
-	TOP_BUILDDIR="$(TOP_BUILDDIR)" \
+	TOP_BUILDDIR="$(TOP_BUILDDIR)" QEMU_ENV="$(QEMU_ENV)" \
 	EXPORT_DIR="$(EXPORT_DIR)" ROOT_DIR="$(ROOT_DIR)" DEPLOY_DIR="$(DEPLOY_DIR)" \
 	PACKAGE_DIR="$(PACKAGE_DIR)" BUILDSPECS_DIR="$(BUILDSPECS_DIR)" \
 	ROS_DISTRO="$(ROS_DISTRO)" WIND_RELEASE_ID="$(WIND_RELEASE_ID)" \

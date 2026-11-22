@@ -69,6 +69,14 @@ sdk.deploy : sdk.install
 sdk.get-pip-url:
 	@echo $(GET_PIP_URL)
 
+# sdk.get-qemu - print the QEMU this release's target is tested with, as KEY=value
+# (files/<rel>/defs.sdk.mk; read by `make qemu-env` and the setup-qemu action)
+.PHONY: sdk.get-qemu
+sdk.get-qemu:
+	@echo QEMU_REPO=$(QEMU_REPO)
+	@echo QEMU_RELEASE=$(QEMU_RELEASE)
+	@echo QEMU_BIN=$(QEMU_BIN)
+
 sdk.clean:
 	@$(call echo_action,Cleaning,$*)
 	@$(CLEAN_STAMP)

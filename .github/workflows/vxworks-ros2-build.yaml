@@ -150,7 +150,7 @@ jobs:
             -v /tmp/wrsdk:/wrsdk \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs sdk-overlay -C /work'
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs sdk-overlay qemu-env -C /work'
 
       - name: Create an SROS2 script
         run: |
@@ -204,6 +204,7 @@ jobs:
           name: hdd-image-${{ env.sdk }}-${{ env.ros_distro }}
           path: |
             ${{ github.workspace }}/output/ros2.img
+            ${{ github.workspace }}/output/qemu.env
             ${{ github.workspace }}/*xWorks*
             ${{ github.workspace }}/*.dtb
 

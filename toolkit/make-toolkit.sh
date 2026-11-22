@@ -3,7 +3,7 @@
 # recipe). Invoked by `make toolkit` (mk/usr/defs.toolkit.mk) with these vars in
 # the environment:
 #
-#   TOP_BUILDDIR EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR
+#   TOP_BUILDDIR QEMU_ENV EXPORT_DIR ROOT_DIR PACKAGE_DIR BUILDSPECS_DIR
 #   ROS_DISTRO WIND_RELEASE_ID TGT_ARCH SDK_NAME
 #   SDK_OVERLAY_STAGE TOOLKIT_SRC_DIR TOOLKIT_TESTS_DIR TOOLKIT_STAGE TOOLKIT_TARBALL
 #
@@ -17,7 +17,8 @@
 #                       that would otherwise be export/deploy; not shipped loose)
 #   scripts/ host-shims/ .vscode/ README.md AGENTS.md - committed tooling
 #   tests/            - the harness on-target tests (main_script.exp, lib/, suites)
-#   manifest.json     - build recipe (keys == Makefile vars) + layer pin
+#   manifest.json     - build recipe (keys == Makefile vars) + layer pin + the
+#                       QEMU the image is tested with
 # then tars it to $TOOLKIT_TARBALL.
 set -euo pipefail
 
@@ -96,10 +97,14 @@ if [ -f "$LAYER_ENV" ]; then
 else
   log "   WARN: $LAYER_ENV missing (ROS 2 SDK built before it was recorded): layer commit unpinned"
 fi
+# the QEMU the image is tested with: written by `make qemu-env` next to ros2.img
+if [ ! -f "${QEMU_ENV:-}" ]; then
+  log "   WARN: ${QEMU_ENV:-qemu.env} missing (run 'make qemu-env'): no qemu in the manifest"
+fi
 if [ -f "$PKGMK" ] && [ -f "$GENMANIFEST" ]; then
   # generate-manifest.py positional args:
   #   mk ros_distro vx_rel vx_sdk arch layer_url layer_branch layer_commit \
-  #   [rust_target] [build_commit] [build_describe]
+  #   [rust_target] [build_commit] [build_describe] [qemu_env]
   python3 "$GENMANIFEST" \
       "$PKGMK" \
       "$ROS_DISTRO" \
@@ -112,6 +117,7 @@ if [ -f "$PKGMK" ] && [ -f "$GENMANIFEST" ]; then
       "${TGT_ARCH:-unknown}-wrs-vxworks" \
       "$BUILD_COMMIT" \
       "$BUILD_DESCRIBE" \
+      "${QEMU_ENV:-}" \
       > "$STAGE/manifest.json" \
     || log "   WARN: manifest generation failed (continuing)"
 else

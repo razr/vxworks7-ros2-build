@@ -96,6 +96,18 @@ endef
 # `make -C pkg/sdk sdk.get-pip-url`, so the overlay installs pip the same way)
 GET_PIP_URL ?= https://bootstrap.pypa.io/pip/3.$(TGT_PYTHON_MINOR)/get-pip.py
 
+# The QEMU the 26.03 targets are tested with, per target arch: _REPO is the full
+# repo, _RELEASE the release in it ("host" = the test host's distro QEMU). Read via
+# `make -C pkg/sdk sdk.get-qemu` (the setup-qemu action, the toolkit manifest).
+QEMU_REPO_x86_64     ?= https://gitlab.com/qemu-project/qemu
+QEMU_RELEASE_x86_64  ?= host
+QEMU_REPO_aarch64    ?= https://github.com/razr/qemu-raspi4-deb
+QEMU_RELEASE_aarch64 ?= v11.1.91-raspi4genet4
+
+QEMU_REPO    = $(QEMU_REPO_$(TGT_ARCH))
+QEMU_RELEASE = $(QEMU_RELEASE_$(TGT_ARCH))
+QEMU_BIN     = qemu-system-$(TGT_ARCH)
+
 define python_fix
 	if [ ! -L $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3 ]; then \
 		ln -f -r -s $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3.$(TGT_PYTHON_MINOR) $(WIND_SDK_HOST_TOOLS)/x86_64-linux/bin/python3; \

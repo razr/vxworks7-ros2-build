@@ -1,6 +1,11 @@
 # Set up the QEMU test host for the VxWorks ROS 2 on-target tests: expect, the
-# x86_64 QEMU, the patched aarch64 QEMU for raspi4b (razr/qemu-raspi4-deb), KVM
-# access and the tap0 NIC. Used by the ros2-test and toolkit-test jobs.
+# QEMU the target is tested with, KVM access and the tap0 NIC. Used by the
+# ros2-test, toolkit-test and unixextra-tests jobs.
+#
+# Which QEMU comes from the release's pkg/sdk/files/<rel>/defs.sdk.mk (QEMU_REPO,
+# QEMU_RELEASE, QEMU_BIN for the target arch), read from output/qemu.env (written
+# by `make qemu-env` in the build job, shipped with the HDD image), or, when that
+# file is absent and an SDK is sourced, straight from `make -C pkg/sdk sdk.get-qemu`.
 name: 'Setup QEMU test host'
 description: 'Install QEMU + expect, enable KVM, create tap0 for the VxWorks tests'
 
@@ -12,29 +17,50 @@ runs:
       env:
         GH_TOKEN: ${{ github.token }}
       run: |
+        set -e
         sudo apt-get update
-        # x86_64 (distro) + aarch64. For aarch64 we use the PATCHED qemu from
-        # razr/qemu-raspi4-deb (BCM2838 GENET, PCIe for USB, SD->emmc2 routing that VxWorks
-        # raspi4b needs; distro qemu-system-aarch64 lacks these). The .deb
-        # installs /usr/bin/qemu-system-aarch64-raspi4; symlink it to the normal
-        # qemu-system-aarch64 name so the harness (qemu_bin) finds it.
-        sudo apt-get install -y expect uml-utilities qemu-system-x86
+        sudo apt-get install -y expect uml-utilities
 
-        # the patched QEMU from the pinned qemu-raspi4-deb release, for this host's
-        # architecture (amd64 on ubuntu-24.04, arm64 on ubuntu-24.04-arm)
-        release=v11.1.91-raspi4genet4
-        arch=$(dpkg --print-architecture)
-        # authenticated download (gh + the job token): the anonymous GitHub API
-        # rate limit on shared runners returns 403
-        rm -rf /tmp/qemu-raspi4 && mkdir -p /tmp/qemu-raspi4
-        gh release download "$release" -R razr/qemu-raspi4-deb -p "*_${arch}.deb" -D /tmp/qemu-raspi4
-        deb="$(ls /tmp/qemu-raspi4/*_${arch}.deb 2>/dev/null | head -1)"
-        [ -n "$deb" ] || { echo "no qemu-raspi4 .deb for $arch in release $release"; exit 1; }
-        echo "qemu-raspi4 deb: $deb"
-        sudo apt-get install -y "$deb"
-        sudo ln -sf /usr/bin/qemu-system-aarch64-raspi4 /usr/local/bin/qemu-system-aarch64
-        qemu-system-x86_64 --version | head -1
-        qemu-system-aarch64 --version | head -1
+        qemu_env="$GITHUB_WORKSPACE/output/qemu.env"
+        if [ ! -f "$qemu_env" ]; then
+          [ -n "${WIND_SDK_HOME:-}" ] \
+            || { echo "no $qemu_env and no SDK sourced: cannot tell which QEMU to install"; exit 1; }
+          mkdir -p "$(dirname "$qemu_env")"
+          make -s --no-print-directory -C "$GITHUB_WORKSPACE/pkg/sdk" \
+            WIND_USR_MK="$GITHUB_WORKSPACE/mk/usr" sdk.get-qemu > "$qemu_env"
+        fi
+        cat "$qemu_env"
+        . "$qemu_env"
+        [ -n "$QEMU_RELEASE" ] && [ -n "$QEMU_BIN" ] \
+          || { echo "QEMU_RELEASE/QEMU_BIN unset in $qemu_env (no QEMU in this release's defs.sdk.mk?)"; exit 1; }
+
+        if [ "$QEMU_RELEASE" = host ]; then
+          # the test host's distro QEMU: the package that provides $QEMU_BIN
+          case "$QEMU_BIN" in
+            qemu-system-x86_64)  pkg=qemu-system-x86 ;;
+            qemu-system-aarch64) pkg=qemu-system-arm ;;
+            *) echo "no distro package known for $QEMU_BIN"; exit 1 ;;
+          esac
+          sudo apt-get install -y "$pkg"
+        else
+          # a .deb from the QEMU_REPO GitHub release, for this host's architecture
+          # (amd64 on ubuntu-24.04, arm64 on ubuntu-24.04-arm). Authenticated
+          # download (gh + the job token): the anonymous GitHub API rate limit on
+          # shared runners returns 403.
+          arch=$(dpkg --print-architecture)
+          dl=/tmp/qemu-deb; rm -rf "$dl" && mkdir -p "$dl"
+          gh release download "$QEMU_RELEASE" -R "${QEMU_REPO#https://github.com/}" -p "*_${arch}.deb" -D "$dl"
+          deb="$(ls "$dl"/*_${arch}.deb 2>/dev/null | head -1)"
+          [ -n "$deb" ] || { echo "no .deb for $arch in $QEMU_REPO release $QEMU_RELEASE"; exit 1; }
+          echo "QEMU deb: $deb"
+          sudo apt-get install -y "$deb"
+          # the deb may name its emulator differently (razr/qemu-raspi4-deb:
+          # qemu-system-aarch64-raspi4); link it to $QEMU_BIN, the name the tests run
+          bin="$(dpkg-deb -c "$deb" | grep -o 'usr/bin/qemu-system-[^ ]*' | head -1)"
+          [ -n "$bin" ] || { echo "no qemu-system-* in $deb"; exit 1; }
+          [ "$(basename "$bin")" = "$QEMU_BIN" ] || sudo ln -sf "/$bin" "/usr/local/bin/$QEMU_BIN"
+        fi
+        "$QEMU_BIN" --version | head -1
 
         # KVM for the x86 target: /dev/kvm is crw-rw---- root:kvm and
         # `usermod -aG kvm` does not apply to the running job shell, so

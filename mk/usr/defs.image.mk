@@ -14,6 +14,10 @@
 
 IMAGE_DEPLOY_STAMPS = $(addprefix $(STAMP_DIR)/,$(addsuffix .deploy,$(DEFAULT_BUILD)))
 ROS2_IMG           ?= $(TOP_BUILDDIR)/ros2.img
+# The QEMU the image is tested with (pkg/sdk sdk.get-qemu, KEY=value): written by
+# `make qemu-env`, shipped with the image to the test jobs and into the toolkit
+# manifest.
+QEMU_ENV           ?= $(TOP_BUILDDIR)/qemu.env
 
 # build_fs - pack a bootable FAT32 image from $(TOP_BUILDDIR)/export/deploy.
 #   $(1) = output image path

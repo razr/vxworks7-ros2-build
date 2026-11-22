@@ -4,12 +4,14 @@
 The JSON keys mirror the Makefile variable names 1:1 (ROS2_PATCH_DIRS,
 ROS_IGNORE_*, ROS2_BASE, ROS2_EXAMPLES, ROS2_RUST, ROS2_MIXINS, ROS2_VENDORS),
 so the manifest is a faithful record of what the SDK build patched / ignored /
-built. Also pins the layer (url + branch + resolved commit) and the SDK/distro/arch.
+built. Also pins the layer (url + branch + resolved commit), the SDK/distro/arch,
+and the QEMU the image is tested with (QEMU_REPO/QEMU_RELEASE/QEMU_BIN, from the
+release's defs.sdk.mk via `make qemu-env`).
 
 Usage:
   generate-manifest.py <packages.mk> <ros_distro> <vxworks_release> \
       <vxworks_sdk> <arch> <layer_url> <layer_branch> <layer_commit> \
-      [rust_target] [build_commit] [build_describe]
+      [rust_target] [build_commit] [build_describe] [qemu_env]
 """
 import re, json, sys, datetime
 
@@ -40,12 +42,27 @@ def var(lines, name):
     return [t for t in body.split() if t and t != '\\']
 
 
+def env_file(path):
+    """KEY=value lines of a `make qemu-env` file; {} if absent."""
+    out = {}
+    if path:
+        try:
+            for ln in open(path).read().splitlines():
+                if '=' in ln and not ln.lstrip().startswith('#'):
+                    k, val = ln.split('=', 1)
+                    out[k.strip()] = val.strip()
+        except FileNotFoundError:
+            pass
+    return out
+
+
 def main():
     (mk, ros_distro, vx_rel, vx_sdk, arch,
      layer_url, layer_branch, layer_commit) = sys.argv[1:9]
     rust_target    = sys.argv[9]  if len(sys.argv) > 9  else f"{arch}-wrs-vxworks"
     build_commit   = sys.argv[10] if len(sys.argv) > 10 else ""
     build_describe = sys.argv[11] if len(sys.argv) > 11 else ""
+    qemu           = env_file(sys.argv[12] if len(sys.argv) > 12 else "")
     lines = open(mk).read().splitlines()
     v = lambda n: var(lines, n)
 
@@ -76,6 +93,8 @@ def main():
         "ROS2_EXAMPLES": v("ROS2_EXAMPLES"),
         "ROS2_RUST": v("ROS2_RUST"),
         "ROS2_RUST_TARGET": rust_target,
+        # the QEMU the image is tested with (keys == the defs.sdk.mk variables)
+        "qemu": {k: qemu.get(k, "") for k in ("QEMU_REPO", "QEMU_RELEASE", "QEMU_BIN")},
         "built_on": datetime.datetime.now().astimezone().isoformat(timespec="seconds"),
     }
     print(json.dumps(manifest, indent=2))
