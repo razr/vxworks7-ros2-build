@@ -1,0 +1,29 @@
+# Python modules the ROS 2 target image needs beyond the SDK's own Python (the
+# interpreter, its standard library and numpy come from the SDK 3pp deploy tree,
+# pkg/sdk sdk_deploy). Pure Python, installed by ros2.deploy into the deploy tree
+# with pip --no-deps: every module the target imports is listed, pinned, and
+# nothing else is pulled in. Also the input of the Debian packaging's target
+# Python debs, so both install the same set.
+
+# setuptools>=81 REMOVED the bundled pkg_resources; ROS 2 Python entry points
+# import pkg_resources at runtime. 58.1.0 matches the SDK cross-venv and still
+# ships pkg_resources.
+setuptools==58.1.0
+# ament_index_python / ros2cli: package metadata
+catkin_pkg==1.1.1
+docutils==0.23              # catkin_pkg
+pyparsing==3.3.3            # catkin_pkg
+python-dateutil==3.0.0      # catkin_pkg
+six==1.17.0                 # python-dateutil
+tzdata==2026.6              # python-dateutil
+# rosidl / launch templates
+empy==3.3.4
+# ros2doctor / rosidl
+pyelftools==0.32
+packaging==26.3
+# rosidl_parser
+lark-parser==0.12.0
+# rclpy.qos imports typing_extensions (TypeAlias)
+typing_extensions==4.12.2
+# launch_ros imports osrf_pycommon (process utils); not in the workspace source
+osrf-pycommon==2.0.2

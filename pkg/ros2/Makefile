@@ -177,6 +177,10 @@ ros2.install : ros2.build
 
 ros2.deploy : ros2.install
 	@$(call echo_action,Installing runtime dependencies,$*)
+ifneq ($(wildcard files/$(ROS_DISTRO)/target-requirements.txt),)
+	# the target Python modules, pinned (files/<distro>/target-requirements.txt)
+	pip3 install --ignore-installed --no-deps --prefix=$(DEPLOY_DIR) -r files/$(ROS_DISTRO)/target-requirements.txt
+else
 	# setuptools>=81 REMOVED the bundled pkg_resources; ROS2 Python entry points
 	# import pkg_resources at runtime. Pin to 58.1.0 (matches the SDK cross-venv,
 	# still ships pkg_resources) so it deploys to the target site-packages.
@@ -190,6 +194,7 @@ ros2.deploy : ros2.install
 	pip3 install --ignore-installed --prefix=$(DEPLOY_DIR) "typing_extensions==4.12.2"
 	# launch_ros imports osrf_pycommon (process utils); pure-python, not in the ws source.
 	pip3 install --ignore-installed --prefix=$(DEPLOY_DIR) "osrf-pycommon==2.0.2"
+endif
 	@$(call echo_action,Installing build artifacts,$*)
 	# Dereference symlinks here (-L) so the deploy tree is symlink-free; FAT/mcopy
 	# cannot store symlinks, and doing it once at deploy lets the image step use a
