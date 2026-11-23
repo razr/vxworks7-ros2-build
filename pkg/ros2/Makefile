@@ -175,6 +175,11 @@ ros2.install : ros2.build
 	cp -r $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/.colcon $(ROOT_DIR)
 	@$(MAKE_STAMP)
 
+# colcon's build dir: one dir per package, with what the package installed
+ROS2_COLCON_BUILD = $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/build
+# the deploy files of the ROS_NATIVE_PKGS, removed by ros2.deploy
+ROS2_NATIVE_FILES = $(BUILD_DIR)/$(PKG_NAME)/native-files.txt
+
 ros2.deploy : ros2.install
 	@$(call echo_action,Installing runtime dependencies,$*)
 ifneq ($(wildcard files/$(ROS_DISTRO)/target-requirements.txt),)
@@ -205,6 +210,20 @@ endif
 	cp -rL --no-preserve=ownership $(ROOT_DIR)/bin/* $(DEPLOY_DIR)/bin/.
 	cp -rL --no-preserve=ownership $(ROOT_DIR)/lib/* $(DEPLOY_DIR)/lib/.
 	cp -rL --no-preserve=ownership $(ROOT_DIR)/share $(DEPLOY_DIR)/.
+	@$(call echo_action,Removing the build-host-only packages,$*)
+	# ROS_NATIVE_PKGS (files/<distro>/packages.mk): what each of them installed (its
+	# CMake install_manifest.txt, or colcon's install.log for Python packages), its
+	# share/<pkg> (with the hooks colcon writes there) and colcon's package entry,
+	# the .pyc compiled from its .py files; then the directories that leaves empty
+	for p in $(filter $(ROS_NATIVE_PKGS),$(notdir $(wildcard $(ROS2_COLCON_BUILD)/*))); do \
+	  for f in install_manifest.txt install.log; do cat $(ROS2_COLCON_BUILD)/$$p/$$f 2>/dev/null; echo; done; \
+	  echo $(ROOT_DIR)/share/$$p; echo $(ROOT_DIR)/share/colcon-core/packages/$$p; \
+	done | sed -n 's|^$(ROOT_DIR)/|$(DEPLOY_DIR)/|p' | sort -u > $(ROS2_NATIVE_FILES)
+	xargs -r -d '\n' rm -rf < $(ROS2_NATIVE_FILES)
+	sed -n 's|/\([^/]*\)\.py$$|/__pycache__/\1.|p' $(ROS2_NATIVE_FILES) | \
+	  while read -r pre; do rm -f "$$pre"*.pyc; echo "$${pre%/*}/x"; done >> $(ROS2_NATIVE_FILES)
+	xargs -r -d '\n' -n1 dirname < $(ROS2_NATIVE_FILES) | sort -u | \
+	  xargs -r -d '\n' rmdir -p --ignore-fail-on-non-empty 2>/dev/null || true
 	cp files/$(ROS_DISTRO)/vxscript.$(TGT_BSP) $(DEPLOY_DIR)/vxscript
 	cp files/$(ROS_DISTRO)/cyclonedds.xml $(DEPLOY_DIR)/.
 	@$(MAKE_STAMP)

@@ -73,6 +73,16 @@ ROS2_BASE=action_msgs ament_cmake ament_cmake_auto ament_cmake_copyright \
 	trajectory_msgs type_description_interfaces uncrustify_vendor unique_identifier_msgs urdf \
 	urdfdom urdfdom_headers urdf_parser_plugin visualization_msgs yaml_cpp_vendor zstd_cmake_module
 
+# ROS_NATIVE_PKGS - packages that run on the build host only (as Yocto's -native
+# recipes): the ament build and lint tools. They are built, but not deployed to the
+# target (ros2.deploy removes the files each installed). Make patterns.
+# Not here: ament_index_cpp/ament_index_python (the resource index at run time),
+# ament_copyright (ros2pkg's create verb imports it; ros2cli loads every verb).
+ROS_NATIVE_PKGS=ament_cmake ament_cmake_% ament_package \
+	ament_lint ament_lint_% ament_clang_format ament_clang_tidy \
+	ament_cppcheck ament_cpplint ament_flake8 ament_mypy ament_pclint ament_pep257 \
+	ament_pycodestyle ament_pyflakes ament_uncrustify ament_xmllint
+
 ROS2_PATCH_DIRS=ament/ament_cmake \
 		ros2-rust/ros2_rust/rclrs \
 		ros2-vendors/asio_vendor \
