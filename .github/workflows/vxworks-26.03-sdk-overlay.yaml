@@ -19,7 +19,7 @@ name: "VxWorks 26.03 SDK overlay"
 
 on:
   push:
-    branches: [master, manifest-rework]   # manifest-rework: until it is merged (the first release)
+    branches: [master]
     paths:
       - 'pkg/sdk/**'
       - 'pkg/unixextra/**'
