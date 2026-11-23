@@ -44,9 +44,9 @@ ROS2_BASE=action_msgs ament_cmake ament_cmake_auto ament_cmake_copyright \
 	ament_uncrustify ament_xmllint builtin_interfaces class_loader common_interfaces \
 	composition_interfaces console_bridge_vendor cyclonedds diagnostic_msgs domain_coordinator \
 	eigen3_cmake_module fastcdr fastdds foonathan_memory_vendor \
-	geometry2 geometry_msgs gmock_vendor gtest_vendor iceoryx_binding_c iceoryx_hoofs \
-	iceoryx_posh kdl_parser keyboard_handler launch launch_ros launch_testing \
-	launch_testing_ament_cmake launch_testing_ros launch_xml launch_yaml lz4_cmake_module \
+	geometry2 geometry_msgs iceoryx_binding_c iceoryx_hoofs \
+	iceoryx_posh kdl_parser keyboard_handler launch launch_ros launch_xml launch_yaml \
+	lz4_cmake_module \
 	libstatistics_collector libyaml_vendor lifecycle_msgs mcap_vendor message_filters \
 	nav_msgs pluginlib \
 	rcl rcl_action rclcpp rclcpp_action rclcpp_components \
@@ -110,7 +110,24 @@ ifeq ($(findstring build-testing-off,$(ROS2_MIXINS)),build-testing-off)
 ROS_IGNORE_TESTING_DIRS = osrf/osrf_testing_tools_cpp \
                           ament/google_benchmark_vendor \
                           ros2/mimick_vendor \
-                          ros2/performance_test_fixture
+                          ros2/performance_test_fixture \
+                          ament/googletest \
+                          ros2/test_interface_files \
+                          ros2/rcl_interfaces/test_msgs \
+                          ros2/ament_cmake_ros/rmw_test_fixture \
+                          ros2/ament_cmake_ros/rmw_test_fixture_implementation \
+                          ros2/launch/launch_testing \
+                          ros2/launch/launch_testing_ament_cmake \
+                          ros2/launch/launch_pytest \
+                          ros2/launch_ros/launch_testing_ros \
+                          ros2/examples/launch_testing \
+                          ros2/ros_testing \
+                          ros2/ros2cli/ros2cli_test_interfaces \
+                          ros2/ros2cli/ros2lifecycle_test_fixtures \
+                          ros2/rosbag2/rosbag2_test_common \
+                          ros2/rosbag2/rosbag2_test_msgdefs \
+                          ros2/rosbag2/rosbag2_tests \
+                          ros2/rosbag2/rosbag2_performance
 endif
 
 # Ignore not used
