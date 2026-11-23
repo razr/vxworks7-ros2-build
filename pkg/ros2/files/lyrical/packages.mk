@@ -83,6 +83,16 @@ ROS_NATIVE_PKGS=ament_cmake ament_cmake_% ament_package \
 	ament_cppcheck ament_cpplint ament_flake8 ament_mypy ament_pclint ament_pep257 \
 	ament_pycodestyle ament_pyflakes ament_uncrustify ament_xmllint
 
+# ROS_TARGET_EXCLUDE, ROS_TARGET_INCLUDE - the ROS 2 files the target does not need
+# at run time: build and development files (CMake files, headers, static libraries,
+# pkg-config files), tests and docs; and what is kept nevertheless (everything under
+# python3.*/test, the headers of Python packages). dpkg --path-exclude /
+# --path-include globs, * also matches /. ros2.deploy removes the files matching an
+# exclude and no include; the target roots built from the debs pass them to dpkg.
+ROS_TARGET_EXCLUDE=*/cmake/* *.cmake */include/* */lib/*/test/* */lib/*/tests/* \
+	*.a *.pc /usr/share/doc/*
+ROS_TARGET_INCLUDE=*/python3.*/test/* */python3.*/include/* */python3.*/*/include/*
+
 ROS2_PATCH_DIRS=ament/ament_cmake \
 		ros2-rust/ros2_rust/rclrs \
 		ros2-vendors/asio_vendor \

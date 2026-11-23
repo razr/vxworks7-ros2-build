@@ -179,6 +179,8 @@ ros2.install : ros2.build
 ROS2_COLCON_BUILD = $(BUILD_DIR)/$(PKG_NAME)/$(PKG_BUILD_DIR)/build
 # the deploy files of the ROS_NATIVE_PKGS, removed by ros2.deploy
 ROS2_NATIVE_FILES = $(BUILD_DIR)/$(PKG_NAME)/native-files.txt
+# the deploy files matching ROS_TARGET_EXCLUDE, removed by ros2.deploy
+ROS2_EXCLUDED_FILES = $(BUILD_DIR)/$(PKG_NAME)/excluded-files.txt
 
 ros2.deploy : ros2.install
 	@$(call echo_action,Installing runtime dependencies,$*)
@@ -223,6 +225,17 @@ endif
 	sed -n 's|/\([^/]*\)\.py$$|/__pycache__/\1.|p' $(ROS2_NATIVE_FILES) | \
 	  while read -r pre; do rm -f "$$pre"*.pyc; echo "$${pre%/*}/x"; done >> $(ROS2_NATIVE_FILES)
 	xargs -r -d '\n' -n1 dirname < $(ROS2_NATIVE_FILES) | sort -u | \
+	  xargs -r -d '\n' rmdir -p --ignore-fail-on-non-empty 2>/dev/null || true
+	@$(call echo_action,Removing the files the target does not need,$*)
+	# ROS_TARGET_EXCLUDE / ROS_TARGET_INCLUDE (files/<distro>/packages.mk): the
+	# deployed files matching an exclude and no include, then the directories that
+	# leaves empty
+	find $(DEPLOY_DIR)/bin $(DEPLOY_DIR)/lib $(DEPLOY_DIR)/share -not -type d \
+	  \( $(foreach p,$(ROS_TARGET_EXCLUDE),-path '$(p)' -o) -false \) \
+	  ! \( $(foreach p,$(ROS_TARGET_INCLUDE),-path '$(p)' -o) -false \) \
+	  > $(ROS2_EXCLUDED_FILES)
+	xargs -r -d '\n' rm -f < $(ROS2_EXCLUDED_FILES)
+	xargs -r -d '\n' -n1 dirname < $(ROS2_EXCLUDED_FILES) | sort -u | \
 	  xargs -r -d '\n' rmdir -p --ignore-fail-on-non-empty 2>/dev/null || true
 	cp files/$(ROS_DISTRO)/vxscript.$(TGT_BSP) $(DEPLOY_DIR)/vxscript
 	cp files/$(ROS_DISTRO)/cyclonedds.xml $(DEPLOY_DIR)/.
