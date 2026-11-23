@@ -1,0 +1,105 @@
+# Build the VxWorks 26.03 SDK overlay and publish it as a GitHub release: the
+# changes that turn a vanilla SDK into the SDK the ROS 2 build uses (pkg/sdk:
+# sdk_fix, python_fix, sdk_install, rust_fix; pkg/unixextra; the CMake
+# toolchain), made by `make sdk-overlay` (mk/usr/make-sdk-overlay.sh) with only the
+# packages it covers: DEFAULT_BUILD="sdk unixextra". No ROS 2 build.
+#
+# One release per overlay, named after it (sdk-overlay-26.03-<arch>, the name
+# mk/usr/defs.sdk_overlay.mk gives it), its asset replaced on each run:
+#   gh release download sdk-overlay-26.03-x86_64 -R razr/vxworks7-ros2-build -p 'sdk-overlay-*'
+#   tar -xf sdk-overlay-26.03-x86_64.tar.*; sdk-overlay-26.03-x86_64/install-sdk-overlay.sh <sdk>
+# Used by builds that start from a vanilla SDK without building the harness (the
+# ros2-vxworks-debian-packaging CI). The harness's own ROS 2 build
+# (vxworks-ros2-build.yaml) still makes and uploads its overlay itself.
+#
+# Runs on a push to master that changes the overlay's sources, or by hand (from any
+# branch: the release then holds that branch's overlay; the release notes name the
+# commit).
+name: "VxWorks 26.03 SDK overlay"
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'pkg/sdk/**'
+      - 'pkg/unixextra/**'
+      - 'buildspecs/cmake/**'
+      - 'mk/usr/make-sdk-overlay.sh'
+      - 'mk/usr/install-sdk-overlay.sh'
+      - 'mk/usr/defs.sdk_overlay.mk'
+      - '.github/workflows/vxworks-26.03-sdk-overlay.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  # the build container of the lyrical build (Docker/26.04), as for the ROS 2 build
+  docker:
+    uses: ./.github/workflows/docker-build.yaml
+    with:
+      ros_distro: lyrical
+
+  sdk-overlay:
+    runs-on: ubuntu-26.04
+    needs: docker
+    strategy:
+      fail-fast: false
+      matrix:
+        sdk: [qemu, raspberrypi4b]
+    concurrency:
+      group: sdk-overlay-26.03-${{ matrix.sdk }}
+      cancel-in-progress: false
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Free up disk space
+        uses: ./.github/actions/free-disk-space
+
+      - name: Download the SDK
+        uses: ./.github/actions/setup-wrsdk
+        with:
+          sdks_list: wrsdks.json
+          sdk: ${{ matrix.sdk }}
+          vxworks: "26.03"
+          directory: /tmp
+          sdkenv: false
+
+      - name: Download the vxros2build container
+        uses: actions/download-artifact@v7
+        with:
+          name: docker-image-vxros2build-lyrical
+          path: /tmp/docker-image
+
+      - name: Load the vxros2build container
+        run: |
+          docker load -i /tmp/docker-image/vxros2build.lyrical.tar.gz
+          rm -rf /tmp/docker-image
+
+      - name: Build the SDK overlay (sdk, unixextra)
+        run: |
+          docker run --rm \
+            -e UID="$(id -u)" -e GID="$(id -g)" \
+            -v /tmp/wrsdk:/wrsdk \
+            -v ${{ github.workspace }}:/work \
+            vxros2build:lyrical \
+            /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make sdk-overlay DEFAULT_BUILD="sdk unixextra" -C /work'
+          ls -l output/sdk-overlay-*.tar.*
+
+      - name: Publish the SDK overlay as a release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          asset=$(ls output/sdk-overlay-*.tar.*)
+          name=$(basename "$asset"); name=${name%%.tar.*}       # sdk-overlay-26.03-<arch>
+          notes="SDK overlay ${name#sdk-overlay-}, SDK ${{ matrix.sdk }}: from ${GITHUB_REF_NAME} ${GITHUB_SHA} (${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})."
+          gh release view "$name" >/dev/null 2>&1 \
+            || gh release create "$name" --title "$name" --notes "$notes" --target "$GITHUB_SHA"
+          gh release upload "$name" "$asset" --clobber
+          gh release edit "$name" --notes "$notes"
+          echo "### $name" >> "$GITHUB_STEP_SUMMARY"
+          echo "$notes" >> "$GITHUB_STEP_SUMMARY"
