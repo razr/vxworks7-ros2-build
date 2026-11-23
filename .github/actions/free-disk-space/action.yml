@@ -1,0 +1,27 @@
+# Free disk space on a GitHub-hosted runner: remove large preinstalled toolchains
+# the VxWorks ROS 2 builds do not need (the SDK alone is ~6.5 GB). Used by the
+# build job (vxworks-ros2-build.yaml) and by the builds of other repos that use
+# the harness (ros2-vxworks-debian-packaging).
+
+name: 'Free disk space'
+description: 'Remove preinstalled toolchains a VxWorks build does not need'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Free up disk space
+      shell: bash
+      run: |
+        echo "Disk before cleanup:"; df -h /
+        sudo rm -rf /usr/share/dotnet || true
+        sudo rm -rf /usr/local/lib/android || true
+        sudo rm -rf /opt/ghc /usr/local/.ghcup || true
+        sudo rm -rf /usr/local/share/boost || true
+        sudo rm -rf /opt/hostedtoolcache/CodeQL || true
+        sudo rm -rf /usr/local/graalvm || true
+        sudo rm -rf /usr/local/share/powershell || true
+        sudo rm -rf /usr/local/share/chromium || true
+        sudo rm -rf /usr/local/lib/node_modules || true
+        sudo docker image prune --all --force || true
+        sudo apt-get clean || true
+        echo "Disk after cleanup:"; df -h /

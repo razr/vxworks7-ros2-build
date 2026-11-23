@@ -89,21 +89,7 @@ jobs:
           ref: ${{ github.ref }}
 
       - name: Free up disk space
-        run: |
-          echo "Disk before cleanup:"; df -h /
-          # Remove large preinstalled toolchains the VxWorks ROS 2 build does not need.
-          sudo rm -rf /usr/share/dotnet || true
-          sudo rm -rf /usr/local/lib/android || true
-          sudo rm -rf /opt/ghc /usr/local/.ghcup || true
-          sudo rm -rf /usr/local/share/boost || true
-          sudo rm -rf /opt/hostedtoolcache/CodeQL || true
-          sudo rm -rf /usr/local/graalvm || true
-          sudo rm -rf /usr/local/share/powershell || true
-          sudo rm -rf /usr/local/share/chromium || true
-          sudo rm -rf /usr/local/lib/node_modules || true
-          sudo docker image prune --all --force || true
-          sudo apt-get clean || true
-          echo "Disk after cleanup:"; df -h /
+        uses: ./.github/actions/free-disk-space
 
       - name: Use Download SDK action
         uses: ./.github/actions/setup-wrsdk
