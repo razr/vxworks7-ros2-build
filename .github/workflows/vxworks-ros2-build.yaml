@@ -72,7 +72,7 @@ jobs:
       ros_distro: ${{ inputs.ros_distro }}
 
   build:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: docker
     outputs:
       sdk: ${{ steps.set_outputs.outputs.sdk }}
@@ -227,7 +227,7 @@ jobs:
           echo "ros_distro=${{ env.ros_distro }}" >> $GITHUB_OUTPUT
 
   toolkit:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: build
     if: ${{ inputs.toolkit }}
     env:
@@ -275,7 +275,7 @@ jobs:
 
   ros2-test:
     # raspberrypi4b: boot the aarch64 target on an arm64 host; x86 SDKs on amd64
-    runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
     needs: build
     if: ${{ inputs.test }}
     steps:
@@ -318,7 +318,7 @@ jobs:
   # host tools (vxsdk/host/x86_64-linux), so on x86; they are run on QEMU on the
   # runner that matches the target (aarch64 raspi4b on arm64, like the ros2-test job).
   toolkit-selftest:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-26.04
     needs: [build, toolkit]
     if: ${{ inputs.test && inputs.toolkit }}
     steps:
@@ -399,7 +399,7 @@ jobs:
 
   toolkit-test:
     # same host choice as the ros2-test job
-    runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
     needs: [build, toolkit-selftest]
     if: ${{ inputs.test && inputs.toolkit }}
     steps:

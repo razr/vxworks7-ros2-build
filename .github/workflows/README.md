@@ -31,9 +31,9 @@ Run the following command from the repository root:
 ```bash
 $ act workflow_dispatch \
     -W .github/workflows/docker-build.yaml \
-    -P ubuntu-24.04=ghcr.io/catthehacker/ubuntu:act-24.04 \
+    -P ubuntu-26.04=ghcr.io/catthehacker/ubuntu:act-26.04 \
     -s GITHUB_TOKEN="$(gh auth token)" \
-    --input ros_distro=jazzy \
+    --input ros_distro=lyrical \
     --artifact-server-path /tmp/artifacts
 ```
 
