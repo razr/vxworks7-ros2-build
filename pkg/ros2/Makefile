@@ -238,7 +238,6 @@ endif
 	xargs -r -d '\n' -n1 dirname < $(ROS2_EXCLUDED_FILES) | sort -u | \
 	  xargs -r -d '\n' rmdir -p --ignore-fail-on-non-empty 2>/dev/null || true
 	cp files/$(ROS_DISTRO)/vxscript.$(TGT_BSP) $(DEPLOY_DIR)/vxscript
-	cp files/$(ROS_DISTRO)/cyclonedds.xml $(DEPLOY_DIR)/.
 	@$(MAKE_STAMP)
 	
 include $(WIND_USR_MK)/rules.packages.mk

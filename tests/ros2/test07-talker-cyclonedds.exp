@@ -4,12 +4,13 @@ proc test07-talker-cyclonedds {} {
     # Same talker/listener as test04 but using the CycloneDDS RMW. CycloneDDS
     # does not use FASTDDS_BUILTIN_TRANSPORTS; on VxWorks two RTPs only discover
     # each other once bound to the loopback interface, so point CYCLONEDDS_URI at
-    # the shipped /usr/cyclonedds.xml (127.0.0.1). Without it the talker
+    # /usr/share/cyclonedds/cyclonedds-loopback.xml (127.0.0.1; installed by
+    # cyclonedds, layer patch 0002). Without it the talker
     # publishes but the listener stays silent. Env is per-RTP, so set RMW +
     # CYCLONEDDS_URI on BOTH the serial console (talker) and the telnet console
     # (listener).
     vxworks::set_env $qemu::spawn_id "RMW_IMPLEMENTATION=rmw_cyclonedds_cpp"
-    vxworks::set_env $qemu::spawn_id "CYCLONEDDS_URI=/usr/cyclonedds.xml"
+    vxworks::set_env $qemu::spawn_id "CYCLONEDDS_URI=/usr/share/cyclonedds/cyclonedds-loopback.xml"
 
     vxworks::send_cmd $qemu::spawn_id "/usr/lib/demo_nodes_cpp/talker"
     expect -exact {Publishing}
@@ -22,7 +23,7 @@ proc test07-talker-cyclonedds {} {
     set tid [telnet::open]
     if {$tid ne ""} {
         vxworks::set_env $tid "RMW_IMPLEMENTATION=rmw_cyclonedds_cpp"
-        vxworks::set_env $tid "CYCLONEDDS_URI=/usr/cyclonedds.xml"
+        vxworks::set_env $tid "CYCLONEDDS_URI=/usr/share/cyclonedds/cyclonedds-loopback.xml"
         vxworks::run_node $tid "/usr/lib/demo_nodes_cpp/listener" "I heard"
         telnet::close $tid
     }

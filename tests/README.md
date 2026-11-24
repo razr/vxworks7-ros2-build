@@ -39,7 +39,7 @@ Each suite numbers its tests from 01. The tables below describe the `ros2` suite
 | `test04-talker` | C++ `demo_nodes_cpp` talker (`Publishing`) + telnet listener (`I heard`) | `rmw_fastrtps_cpp` / SHM |
 | `test05-rclrs` | Rust `examples_rclrs_minimal_pub_sub` publisher/subscriber (`Publishing`) | `rmw_fastrtps_cpp` / SHM |
 | `test06-talker-udpv4` | Same talker/listener as test04 but forcing the UDPv4 builtin transport (no shared memory) | `rmw_fastrtps_cpp` / UDPv4 |
-| `test07-talker-cyclonedds` | Same talker/listener as test04 under CycloneDDS; points `CYCLONEDDS_URI` at the shipped `/usr/cyclonedds.xml` (loopback `127.0.0.1`) so the two RTPs discover each other | `rmw_cyclonedds_cpp` / loopback |
+| `test07-talker-cyclonedds` | Same talker/listener as test04 under CycloneDDS; points `CYCLONEDDS_URI` at `/usr/share/cyclonedds/cyclonedds-loopback.xml` (loopback `127.0.0.1`, installed by `cyclonedds`, layer patch 0002) so the two RTPs discover each other | `rmw_cyclonedds_cpp` / loopback |
 | `test99-sros2` | SROS 2 secure pub/sub: talker (`Publishing`) + telnet listener (`I heard`), each with its enclave, `ROS_SECURITY_STRATEGY=Enforce`; **skips** if `/usr/demo_keystore/public` has no `ca.cert.pem` | `rmw_fastrtps_cpp` / UDPv4 |
 
 Transport env is set **per-RTP**, so pub/sub tests set `RMW_IMPLEMENTATION` (and the
