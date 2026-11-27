@@ -19,7 +19,8 @@ ROS2_IMG           ?= $(TOP_BUILDDIR)/ros2.img
 # manifest.
 QEMU_ENV           ?= $(TOP_BUILDDIR)/qemu.env
 
-# build_fs - pack a bootable FAT32 image from $(TOP_BUILDDIR)/export/deploy.
+# build_fs - pack a bootable FAT32 image from $(TOP_BUILDDIR)/export/deploy, sized
+# to its content (mk/usr/image-size.sh).
 #   $(1) = output image path
 # Same body as before, just factored into a reusable macro so the `image` target
 # (in the top-level Makefile) is a thin `$(call build_fs,...)`. Defined here,
@@ -27,7 +28,7 @@ QEMU_ENV           ?= $(TOP_BUILDDIR)/qemu.env
 # pkg_* in defs.autotools.mk).
 define build_fs
 	mkdir -p $(dir $(1))
-	dd if=/dev/zero of=$(1) count=2048 bs=1M
+	dd if=/dev/zero of=$(1) count=$$($(WIND_USR_MK)/image-size.sh $(TOP_BUILDDIR)/export/deploy) bs=1M
 	mkfs.vfat -F 32 $(1)
 	mkdir -p $(TOP_BUILDDIR)/mount
 	fusefat -o rw+ $(1) $(TOP_BUILDDIR)/mount

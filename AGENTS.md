@@ -20,7 +20,7 @@ space (RTPs) against a vanilla Wind River VxWorks SDK, packs a bootable image
 | `tests/` | on-target Expect tests: `main_script.exp`, `lib/`, suites `ros2`, `toolkit`, `unixextra` |
 | `toolkit/` | `make-toolkit.sh`, the toolkit's scripts, `README.md`, `AGENTS.md` and release-notes template |
 | `.github/` | CI: per-target workflows, the reusable build workflow, `setup-qemu`/`setup-wrsdk` actions |
-| `output/` | build output (not committed) |
+| `output.<bsp>/` | build output, one per BSP (`output.itl_generic`, `output.rpi_4`; not committed) |
 
 ## Scope
 
@@ -35,17 +35,17 @@ In the `vxros2build:lyrical` container, with the SDK mounted at `/wrsdk`:
 ```bash
 source /wrsdk/sdkenv.sh
 make info        # check the configuration
-make             # build ROS 2 and its dependencies -> output/export/root
-make image       # pack output/ros2.img
+make             # build ROS 2 and its dependencies -> output.<bsp>/export/root
+make image       # pack output.<bsp>/ros2.img
 make toolkit     # pack the toolkit tarball
 ```
 
 ## Test
 
 ```bash
-tests/main_script.exp output/ros2.img                    # the ros2 suite
-tests/main_script.exp output/ros2.img ros2/test04-talker # one test
-VX_USB=<dir> tests/main_script.exp output/ros2.img toolkit
+tests/main_script.exp output.<bsp>/ros2.img                    # the ros2 suite
+tests/main_script.exp output.<bsp>/ros2.img ros2/test04-talker # one test
+VX_USB=<dir> tests/main_script.exp output.<bsp>/ros2.img toolkit
 ```
 
 Needs QEMU, `expect`, `telnet` and `tap0` up at `192.168.200.254/24`. The target
@@ -61,7 +61,7 @@ Needs QEMU, `expect`, `telnet` and `tap0` up at `192.168.200.254/24`. The target
 ## Where a fix goes
 
 - ROS 2 source patches: the layer repo `vxworks7-layer-for-ros2`, branch
-  `lyrical-release-26.03`, cloned by the build into `output/build/ros2/patches`.
+  `lyrical-release-26.03`, cloned by the build into `output.<bsp>/build/ros2/patches`.
   Not in this repo.
 - SDK problems: `pkg/sdk/files/26.03/` (applied by the SDK overlay). Never edit
   the SDK itself.

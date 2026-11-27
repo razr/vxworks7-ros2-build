@@ -370,8 +370,8 @@ grep -n "static_cast" $WIND_CC_SYSROOT/usr/h/published/UTILS_UNIX/unistd.h
 ### 5. Verify Deployment Files
 
 ```bash
-ls -la output/export/deploy/lib/
-ls -la output/export/deploy/bin/
+ls -la output.<bsp>/export/deploy/lib/
+ls -la output.<bsp>/export/deploy/bin/
 ```
 
 ---

@@ -25,7 +25,7 @@
 #
 # All inputs auto-default, so from the build tree with the SDK env sourced you can
 # just run `selftest-build.sh` with no args:
-#   --toolkit  : newest output/toolkit-*.tar.* (else output/<kit-dir>)
+#   --toolkit  : newest output.<bsp>/toolkit-*.tar.* (else output.<bsp>/<kit-dir>)
 #   --sdk  : $WIND_SDK_HOME / $WIND_HOME / $WRSDK (whichever has sdkenv.sh)
 #   --img  : the toolkit's OWN shipped image ($TOOLKIT_ROOT/ros2.img)
 #   --lang : all (default) builds C++ + Rust + Python; or pick one
@@ -43,7 +43,6 @@ set -euo pipefail
 # (scripts live at toolkit/scripts/ in-tree, or scripts/ inside an unpacked toolkit).
 SELF_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BUILD_TREE="$(cd "$SELF_DIR/../.." && pwd)"   # toolkit/scripts -> repo root
-OUT_DIR="$BUILD_TREE/output"
 
 TOOLKIT_SRC=""; SDK=""; IMG=""; WORKDIR=""; CLEAN=0; LANG_SEL="all"
 
@@ -72,13 +71,14 @@ pass() { printf 'SELFTEST-BUILD PASS: %s\n' "$*"; }
 die()  { printf 'SELFTEST-BUILD FAIL: %s\n' "$*" >&2; exit 1; }
 
 # --- defaults ---------------------------------------------------------------
-# --toolkit: newest toolkit tarball under output/, else a single unpacked toolkit dir there.
+# --toolkit: newest toolkit tarball under the build outputs (output.<bsp>/), else a
+# single unpacked toolkit dir there.
 if [ -z "$TOOLKIT_SRC" ]; then
-  TOOLKIT_SRC="$(ls -t "$OUT_DIR"/toolkit-*.tar.zst \
-                    "$OUT_DIR"/toolkit-*.tar.gz \
-                    "$OUT_DIR"/toolkit-*.tgz 2>/dev/null | head -1 || true)"
-  [ -n "$TOOLKIT_SRC" ] || TOOLKIT_SRC="$(find "$OUT_DIR" -maxdepth 1 -type d -name 'toolkit-*' ! -name toolkit-build 2>/dev/null | head -1 || true)"
-  [ -n "$TOOLKIT_SRC" ] || die "no toolkit under $OUT_DIR (run 'make toolkit' first, or pass --toolkit)"
+  TOOLKIT_SRC="$(ls -t "$BUILD_TREE"/output.*/toolkit-*.tar.zst \
+                    "$BUILD_TREE"/output.*/toolkit-*.tar.gz \
+                    "$BUILD_TREE"/output.*/toolkit-*.tgz 2>/dev/null | head -1 || true)"
+  [ -n "$TOOLKIT_SRC" ] || TOOLKIT_SRC="$(find "$BUILD_TREE"/output.* -maxdepth 1 -type d -name 'toolkit-*' ! -name toolkit-build 2>/dev/null | head -1 || true)"
+  [ -n "$TOOLKIT_SRC" ] || die "no toolkit under $BUILD_TREE/output.<bsp>/ (run 'make toolkit' first, or pass --toolkit)"
   say "auto --toolkit $TOOLKIT_SRC"
 fi
 # --sdk: trust the already-sourced SDK env, else common vars.

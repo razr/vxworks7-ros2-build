@@ -87,14 +87,14 @@ jobs:
             -v ${{ github.workspace }}:/work \
             vxros2build:lyrical \
             /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make sdk-overlay DEFAULT_BUILD="sdk unixextra" -C /work'
-          ls -l output/sdk-overlay-*.tar.*
+          ls -l output.*/sdk-overlay-*.tar.*
 
       - name: Publish the SDK overlay as a release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -eu
-          asset=$(ls output/sdk-overlay-*.tar.*)
+          asset=$(ls output.*/sdk-overlay-*.tar.*)   # the one output.<bsp> of this job
           name=$(basename "$asset"); name=${name%%.tar.*}       # sdk-overlay-26.03-<arch>
           notes="SDK overlay ${name#sdk-overlay-}, SDK ${{ matrix.sdk }}: from ${GITHUB_REF_NAME} ${GITHUB_SHA} (${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})."
           gh release view "$name" >/dev/null 2>&1 \

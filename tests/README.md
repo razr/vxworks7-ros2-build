@@ -113,7 +113,7 @@ tuned per target and controlled by these env vars:
 
 ```bash
 source /path/to/wrsdk-vxworks7-qemu/sdkenv.sh
-./tests/main_script.exp output/ros2.img ros2
+./tests/main_script.exp output.itl_generic/ros2.img ros2
 ```
 
 **aarch64 / raspi4b** — needs a QEMU with the BCM2838 GENET + SD→emmc2 model
@@ -125,14 +125,14 @@ default timeout accounts for that.
 cd <harness>
 source ~/Downloads/wrsdk-vxworks7-raspberrypi4b-1.9.0/sdkenv.sh
 VX_QEMU=/path/to/patched/qemu-system-aarch64 \
-  ./tests/main_script.exp output-rpi-4/ros2.img
+  ./tests/main_script.exp output.rpi_4/ros2.img
 ```
 
 Run a single test (recommended on raspi4, since TCG boot is slow):
 
 ```bash
 VX_QEMU=/path/to/patched/qemu-system-aarch64 \
-  ./tests/main_script.exp output-rpi-4/ros2.img ros2/test02-timer_lambda
+  ./tests/main_script.exp output.rpi_4/ros2.img ros2/test02-timer_lambda
 ```
 
 The raspi4 boot line is passed via QEMU `-append` (lands in the dtb `/chosen/bootargs`,

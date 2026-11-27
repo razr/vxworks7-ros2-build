@@ -77,6 +77,8 @@ jobs:
     outputs:
       sdk: ${{ steps.set_outputs.outputs.sdk }}
       ros_distro: ${{ steps.set_outputs.outputs.ros_distro }}
+      # the build output dir, output.<bsp> (TOP_BUILDDIR)
+      builddir: ${{ steps.builddir.outputs.builddir }}
     env:
       ros_distro: ${{ inputs.ros_distro }}
       vxworks:   ${{ inputs.vxworks }}
@@ -138,6 +140,19 @@ jobs:
             vxros2build:${{ env.ros_distro }} \
             /bin/bash -c 'set -- /wrsdk/sdkenv.sh; . /wrsdk/sdkenv.sh && make fs sdk-overlay qemu-env -C /work'
 
+      # the output dir the build made: output.<bsp> (Makefile TOP_BUILDDIR), the
+      # only one in a fresh checkout
+      - name: Find the build output dir
+        id: builddir
+        run: |
+          set -eu
+          dirs=$(cd ${{ github.workspace }} && ls -d output.*/)
+          [ "$(echo "$dirs" | wc -l)" = 1 ] || { echo "not exactly one output.<bsp>/: $dirs"; exit 1; }
+          d=${dirs%/}
+          echo "BUILDDIR=$d" >> "$GITHUB_ENV"
+          echo "builddir=$d" >> "$GITHUB_OUTPUT"
+          echo "build output: $d"
+
       - name: Create an SROS2 script
         run: |
           cat << 'EOF' > /tmp/sros2_script.sh
@@ -158,21 +173,24 @@ jobs:
             -v /tmp/sros2_script.sh:/tmp/sros2_script.sh \
             -v ${{ github.workspace }}:/work \
             vxros2build:${{ env.ros_distro }} \
-            /bin/bash -c 'cd /tmp && /tmp/sros2_script.sh && mv /tmp/demo_keystore /work/output/export/deploy/.'
+            /bin/bash -c 'cd /tmp && /tmp/sros2_script.sh && mv /tmp/demo_keystore /work/${{ env.BUILDDIR }}/export/deploy/.'
 
       - name: Create an HDD image
         run: |
           sudo apt-get update
           sudo apt-get install -y dosfstools
           cd ${{ github.workspace }}
-          # Build the image at the Makefile's canonical location (output/ros2.img,
+          # Build the image at the Makefile's canonical location ($BUILDDIR/ros2.img,
           # = $(TOP_BUILDDIR)/ros2.img) so downstream consumers (make toolkit /
           # make-toolkit.sh) find it where they expect.
-          dd if=/dev/zero of=output/ros2.img count=2048 bs=1M
-          mkfs.vfat -F 32 ./output/ros2.img
+          # sized to the content, as make image (mk/usr/image-size.sh)
+          mb=$(mk/usr/image-size.sh "$BUILDDIR/export/deploy")
+          echo "image: $mb MB"
+          dd if=/dev/zero of="$BUILDDIR/ros2.img" count="$mb" bs=1M
+          mkfs.vfat -F 32 "$BUILDDIR/ros2.img"
           mkdir -p /tmp/mount
-          sudo mount -o loop -t vfat ./output/ros2.img /tmp/mount
-          sudo cp -r -L ./output/export/deploy/* /tmp/mount/.
+          sudo mount -o loop -t vfat "$BUILDDIR/ros2.img" /tmp/mount
+          sudo cp -r -L "$BUILDDIR"/export/deploy/* /tmp/mount/.
           df -h /tmp/mount/
           sudo umount /tmp/mount
 
@@ -189,15 +207,15 @@ jobs:
         with:
           name: hdd-image-${{ env.sdk }}-${{ env.ros_distro }}
           path: |
-            ${{ github.workspace }}/output/ros2.img
-            ${{ github.workspace }}/output/qemu.env
+            ${{ github.workspace }}/${{ env.BUILDDIR }}/ros2.img
+            ${{ github.workspace }}/${{ env.BUILDDIR }}/qemu.env
             ${{ github.workspace }}/*xWorks*
             ${{ github.workspace }}/*.dtb
 
       - name: Pack the ROS 2 SDK (export/root)
         run: |
           # tar, because upload-artifact does not keep symlinks (.so chains).
-          cd ${{ github.workspace }}/output
+          cd ${{ github.workspace }}/${{ env.BUILDDIR }}
           tar --zstd -cf ros2-sdk.tar.zst export/root
           ls -l ros2-sdk.tar.zst
 
@@ -205,14 +223,14 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ros2-sdk-${{ env.sdk }}-${{ env.ros_distro }}
-          path: ${{ github.workspace }}/output/ros2-sdk.tar.zst
+          path: ${{ github.workspace }}/${{ env.BUILDDIR }}/ros2-sdk.tar.zst
 
       - name: Upload the SDK overlay
         uses: actions/upload-artifact@v6
         with:
           name: sdk-overlay-${{ env.sdk }}-${{ env.ros_distro }}
           # make sdk-overlay's archive (files/ + sdk_overlay.json + install-sdk-overlay.sh)
-          path: ${{ github.workspace }}/output/sdk-overlay-*.tar.*
+          path: ${{ github.workspace }}/${{ env.BUILDDIR }}/sdk-overlay-*.tar.*
 
       - name: Setup upterm session
         if: ${{ always() && inputs.debug }}
@@ -232,6 +250,7 @@ jobs:
     if: ${{ inputs.toolkit }}
     env:
       ROS_DISTRO: ${{ needs.build.outputs.ros_distro }}
+      BUILDDIR: ${{ needs.build.outputs.builddir }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -249,17 +268,17 @@ jobs:
         uses: actions/download-artifact@v7
         with:
           name: ros2-sdk-${{ needs.build.outputs.sdk }}-${{ needs.build.outputs.ros_distro }}
-          path: ${{ github.workspace }}/output
+          path: ${{ github.workspace }}/${{ env.BUILDDIR }}
 
       - name: Download the SDK overlay
         uses: actions/download-artifact@v7
         with:
           name: sdk-overlay-${{ needs.build.outputs.sdk }}-${{ needs.build.outputs.ros_distro }}
-          path: ${{ github.workspace }}/output
+          path: ${{ github.workspace }}/${{ env.BUILDDIR }}
 
       - name: Assemble the ROS 2 SDK toolkit
         run: |
-          cd ${{ github.workspace }}/output
+          cd ${{ github.workspace }}/${{ env.BUILDDIR }}
           tar --zstd -xf ros2-sdk.tar.zst && rm ros2-sdk.tar.zst
           mkdir -p sdk-overlay-build
           # make-sdk-overlay.sh writes .tar.zst, or .tar.gz without zstd: let tar detect it
@@ -271,13 +290,15 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: ros2-vxworks-toolkit-${{ needs.build.outputs.sdk }}-${{ needs.build.outputs.ros_distro }}
-          path: ${{ github.workspace }}/output/toolkit-*.tar.*
+          path: ${{ github.workspace }}/${{ env.BUILDDIR }}/toolkit-*.tar.*
 
   ros2-test:
     # raspberrypi4b: boot the aarch64 target on an arm64 host; x86 SDKs on amd64
     runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
     needs: build
     if: ${{ inputs.test }}
+    env:
+      BUILDDIR: ${{ needs.build.outputs.builddir }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -309,10 +330,10 @@ jobs:
           [ "$SDK" = "raspberrypi4b" ] && export VX_TARGET=rpi4
 
           # Run tests. The HDD-image artifact preserves its build-job path, so the
-          # downloaded image is at ./output/ros2.img (the Makefile canonical
+          # downloaded image is at ./$BUILDDIR/ros2.img (the Makefile canonical
           # location); pass it explicitly to main_script.exp (default ./ros2.img).
           echo "Running tests..."
-          ./tests/main_script.exp output/ros2.img ros2
+          ./tests/main_script.exp "$BUILDDIR/ros2.img" ros2
 
   # The toolkit self-test, split by host: the samples are built with the SDK's
   # host tools (vxsdk/host/x86_64-linux), so on x86; they are run on QEMU on the
@@ -402,6 +423,8 @@ jobs:
     runs-on: ${{ needs.build.outputs.sdk == 'raspberrypi4b' && 'ubuntu-26.04-arm' || 'ubuntu-26.04' }}
     needs: [build, toolkit-selftest]
     if: ${{ inputs.test && inputs.toolkit }}
+    env:
+      BUILDDIR: ${{ needs.build.outputs.builddir }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5

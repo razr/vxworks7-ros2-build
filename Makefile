@@ -1,4 +1,7 @@
-export TOP_BUILDDIR?=$(CURDIR)/output
+# The build output, one per BSP: output.<bsp> (TGT_BSP, from the sourced SDK, or from
+# the output dir holding the SDK overlay; mk/usr/defs.vxworks.mk), e.g.
+# output.itl_generic (qemu), output.rpi_4 (raspberrypi4b).
+export TOP_BUILDDIR?=$(CURDIR)/output.$(TGT_BSP)
 export WIND_USR_MK=$(CURDIR)/mk/usr
 export PACKAGE_DIR=$(CURDIR)/pkg
 export BUILDSPECS_DIR=$(CURDIR)/buildspecs
@@ -39,10 +42,13 @@ all: $(DOWNLOADS_DIR) $(STAMP_DIR) $(EXPORT_DIR)
 	for p in $(DEFAULT_BUILD); do $(MAKE) -C pkg/$$p $$p.install || exit 1; done;
 
 # fs - lay out export/deploy from the built packages and prepare it for the target
-# (defs.fs.mk::fs_deploy, fs_prepare_deploy).
+# (defs.fs.mk::fs_deploy, fs_prepare_deploy, fs_soname, fs_strip, fs_needed).
 fs: all
 	$(call fs_deploy)
 	$(call fs_prepare_deploy)
+	$(call fs_soname)
+	$(call fs_strip)
+	$(call fs_needed)
 
 # sdk-overlay - make the SDK overlay: output/sdk-overlay-build/<name>/ + the
 # output/<name>.tar.zst archive (defs.sdk_overlay.mk::build_sdk_overlay).

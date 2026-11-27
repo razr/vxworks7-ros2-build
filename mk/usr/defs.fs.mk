@@ -8,7 +8,8 @@
 # Included from the top-level Makefile. Depends on: DEFAULT_BUILD, DEPLOY_DIR,
 # STAMP_DIR (from defs.common/packages.mk), the `all` target and the
 # python_prepare_deploy macro (defs.python.mk). The `fs` phony target lives in the
-# top-level Makefile and calls fs_deploy, then fs_prepare_deploy, below.
+# top-level Makefile and calls, in this order: fs_deploy, fs_prepare_deploy,
+# fs_soname, fs_strip, fs_needed (the last three: mk/usr/fs-libs.sh).
 
 # fs_deploy - stage each DEFAULT_BUILD package's runtime files into $(DEPLOY_DIR)
 # (each sub-make touches its $(STAMP_DIR)/<pkg>.deploy stamp). No args.
@@ -38,4 +39,23 @@ define fs_prepare_deploy
 	    -not -path '*/python3.*/test' -not -path '*/python3.*/test/*' -exec rm -rf {} +
 	find $(TOP_BUILDDIR)/export/deploy/lib -type d -name include -not -path '*/python3.*/*' -exec rm -rf {} +
 	find $(TOP_BUILDDIR)/export/deploy \( -name '*.a' -o -name '*.pc' \) -type f -delete
+endef
+
+# fs_soname - one copy of each shared library, under its SONAME (the VxWorks
+# loader loads by SONAME; the package deploys copy every name of a version chain,
+# cp -L). No args.
+define fs_soname
+	$(WIND_USR_MK)/fs-libs.sh soname $(TOP_BUILDDIR)/export/deploy
+endef
+
+# fs_strip - remove the debug info from the deployed ELF files (wr-strip
+# --strip-debug; symbol tables stay). export/root keeps the files as built. No args.
+define fs_strip
+	$(WIND_USR_MK)/fs-libs.sh strip $(TOP_BUILDDIR)/export/deploy
+endef
+
+# fs_needed - check that every DT_NEEDED of every deployed ELF file is in
+# export/deploy/lib (LD_LIBRARY_PATH=/usr/lib on the target). No args.
+define fs_needed
+	$(WIND_USR_MK)/fs-libs.sh needed $(TOP_BUILDDIR)/export/deploy
 endef

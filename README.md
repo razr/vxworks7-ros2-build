@@ -101,10 +101,11 @@ The project uses Makefile to invoke a ros2 and turtlebot3 `colcon`-based build a
 │   └── unixextra   - extra Unix functions necessary to build ROS 2
 ```
 
-After the build following artifacts will be created under the `output` directory:
+After the build following artifacts will be created under the `output.<bsp>` directory, one per BSP of the
+sourced SDK (the harness `TGT_BSP`: `output.itl_generic` for qemu, `output.rpi_4` for raspberrypi4b):
 
 ```bash
-output
+output.itl_generic
 ├── build
 │   ├── asio        - pkg build artifacts
 │   ├── eigen
@@ -126,7 +127,7 @@ Patches are necessary to build ROS 2 for VxWorks and are located in the separate
 The repository is cloned during the build to the *patches* dir.
 
 ```bash
-output
+output.itl_generic
 ├── build
 │   ├── ros2
 │   │   ├── patches
@@ -204,12 +205,12 @@ TARGET PYTHON:      Python3.9
 HOST PYTHON:        /wrsdk/vxsdk/host/x86_64-linux/bin/python3
 CMAKE:              /wrsdk/vxsdk/host/x86_64-linux/bin/cmake
 CURDIR:             /work
-DOWNLOADS_DIR:      /work/output/downloads
+DOWNLOADS_DIR:      /work/output.itl_generic/downloads
 PACKAGE_DIR:        /work/pkg
-BUILD_DIR:          /work/output/build
-EXPORT_DIR:         /work/output/export
-ROOT_DIR:           /work/output/export/root
-DEPLOY_DIR:         /work/output/export/deploy
+BUILD_DIR:          /work/output.itl_generic/build
+EXPORT_DIR:         /work/output.itl_generic/export
+ROOT_DIR:           /work/output.itl_generic/export/root
+DEPLOY_DIR:         /work/output.itl_generic/export/deploy
 WIND_CC_SYSROOT:    /wrsdk/vxsdk/sysroot
 WIND_SDK_HOST_TOOLS:/wrsdk/vxsdk/host
 3PP_DEPLOY_DIR:     /wrsdk/vxsdk/sysroot/usr/3pp/deploy
@@ -222,7 +223,7 @@ wruser@vxros2:/work exit
 Build artifacts are in the `export` directory
 
 ```bash
-wruser@vxros2:/work ls output/export/deploy/
+wruser@vxros2:/work ls output.itl_generic/export/deploy/
 bin  lib  share  vxscript
 ```
 
@@ -297,7 +298,7 @@ distro QEMU) and `QEMU_BIN` (`qemu-system-<arch>`). For 26.03:
 | x86_64 | the host's distro QEMU (`sudo apt-get install qemu-system-x86`) |
 | aarch64 (raspi4b) | `qemu-system-aarch64-raspi4` from https://github.com/razr/qemu-raspi4-deb release `v11.1.91-raspi4genet4` (stock QEMU cannot boot it) |
 
-`make qemu-env` writes the values for the sourced SDK to `output/qemu.env`; the CI
+`make qemu-env` writes the values for the sourced SDK to `output.<bsp>/qemu.env`; the CI
 `setup-qemu` action installs from it, and the toolkit's `manifest.json` records it.
 
 A filesystem with ROS 2 artifacts needs to be prepared to boot with VxWorks.
@@ -323,15 +324,15 @@ If you want to do it manually, run
 $ echo create a ready-to-deploy filesystem
 $ make fs
 
-$ echo create a disk 2048MB
-$ dd if=/dev/zero of=./output/ros2.img count=2048 bs=1M
+$ echo create a disk sized to the content
+$ dd if=/dev/zero of=./output.itl_generic/ros2.img count=$(mk/usr/image-size.sh output.itl_generic/export/deploy) bs=1M
 $ echo format it as a FAT32
-$ mkfs.vfat -F 32 ./output/ros2.img
+$ mkfs.vfat -F 32 ./output.itl_generic/ros2.img
 
 $ echo mount, copy, unmount, you need to be `sudo`
 $ mkdir -p ~/tmp/mount
-$ sudo mount -o loop -t vfat ./output/ros2.img ~/tmp/mount
-$ sudo cp -r -L ./output/export/deploy/* ~/tmp/mount/.
+$ sudo mount -o loop -t vfat ./output.itl_generic/ros2.img ~/tmp/mount
+$ sudo cp -r -L ./output.itl_generic/export/deploy/* ~/tmp/mount/.
 $ sudo umount ~/tmp/mount
 ```
 
@@ -341,7 +342,7 @@ $ sudo umount ~/tmp/mount
 sudo qemu-system-x86_64 -m 2G -machine q35 -cpu Nehalem -kernel ~/Downloads/wrsdk/vxsdk/bsps/*/vxWorks \
 -net nic -net tap,ifname=tap0,script=no,downscript=no -display none -serial mon:stdio \
 -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 g=192.168.200.254 u=ftp pw=ftp123 o=gei0 s=/ata0/vxscript" \
--device ich9-ahci,id=ahci -drive file=./output/ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
+-device ich9-ahci,id=ahci -drive file=./output.itl_generic/ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
 ```
 
 The HDD image will be mounted inside VxWorks under the `/usr` directory
@@ -366,7 +367,7 @@ Follow [README](https://d13321s3lxgewa.cloudfront.net/downloads/wrsdk-vxworks7-d
 Copy the content of the `deploy` directory to the '/usr' directory of the SDCard
 
 ```bash
-$ sudo cp -r -L ./output/export/deploy/* /usr/.
+$ sudo cp -r -L ./output.itl_generic/export/deploy/* /usr/.
 ```
 
 ### Run ROS 2 C++ examples
@@ -445,7 +446,7 @@ ros2 security create_enclave demo_keystore /talker_listener/listener
 Copy directory `demo_keystore` to the `deploy`, and create `ros2.img`
 
 ```bash
-cp demo_keystore output/export/deploy/.
+cp demo_keystore output.itl_generic/export/deploy/.
 make image
 ```
 
@@ -455,7 +456,7 @@ Start QEMU, enable security and run SROS2 example.
 sudo qemu-system-x86_64 -m 2G -machine q35 -cpu Nehalem -kernel ~/Downloads/wrsdk/vxsdk/bsps/*/vxWorks \
 -net nic -net tap,ifname=tap0,script=no,downscript=no -display none -serial mon:stdio \
 -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 g=192.168.200.254 u=ftp pw=ftp123 o=gei0 s=/ata0/vxscript" \
--device ich9-ahci,id=ahci -drive file=./output/ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
+-device ich9-ahci,id=ahci -drive file=./output.itl_generic/ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
 
 -> cmd
 [vxWorks *]# set env "ROS_SECURITY_ENABLE=true"
@@ -531,7 +532,7 @@ Native ROS 2 is used mostly for fast prototyping during ROS 2 development. Use t
 $ cd vxworks7-ros2-build
 $ docker run -ti -h ros2native -v $PWD:/work vxros2build:lyrical
 wruser@ros2native:/work$ mkdir -p ros2_native/src && cd ros2_native
-wruser@ros2native:/work/ros2_native$ vcs import src < /work/output/build/ros2/ros2_ws/ros2.repos
+wruser@ros2native:/work/ros2_native$ vcs import src < /work/output.itl_generic/build/ros2/ros2_ws/ros2.repos
 wruser@ros2native:/work/ros2_native$ colcon build --merge-install --cmake-force-configure --packages-up-to-regex \
    examples_rclcpp_minimal_timer \
    examples_rclcpp_minimal_client \
@@ -658,7 +659,7 @@ wruser@vxros2:/work$ exit
 $ sudo qemu-system-x86_64 -m 2G -machine q35 -cpu Nehalem -kernel ~/Downloads/wrsdk/vxsdk/bsps/*/vxWorks \
 -net nic -net tap,ifname=tap0,script=no,downscript=no -display none -serial mon:stdio \
 -append "bootline:fs(0,0)host:/vxWorks h=192.168.200.254 e=192.168.200.1 g=192.168.200.254 u=ftp pw=ftp123 o=gei0 s=/ata0/vxscript" \
--device ich9-ahci,id=ahci -drive file=./output/ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
+-device ich9-ahci,id=ahci -drive file=./output.itl_generic/ros2.img,if=none,id=ros2disk,format=raw -device ide-hd,drive=ros2disk,bus=ahci.0
 ```
 
 4. Setup environment variables and run `my_package`

@@ -16,7 +16,7 @@
 # TOOLKIT_SRC_DIR = the committed kit tooling in the repo (scripts, host-shims,
 #                   vscode, README, make-toolkit.sh).
 # TOOLKIT_TESTS_DIR = the harness on-target tests, shipped in the kit as tests/.
-# TOOLKIT_BUILD   = where the kit is staged + tarred (under output/).
+# TOOLKIT_BUILD   = where the kit is staged + tarred (under output.<bsp>/).
 TOOLKIT_SRC_DIR ?= $(CURDIR)/toolkit
 TOOLKIT_TESTS_DIR ?= $(CURDIR)/tests
 TOOLKIT_BUILD   ?= $(TOP_BUILDDIR)/toolkit-build

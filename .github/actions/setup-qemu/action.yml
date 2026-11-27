@@ -3,9 +3,10 @@
 # ros2-test, toolkit-test and unixextra-tests jobs.
 #
 # Which QEMU comes from the release's pkg/sdk/files/<rel>/defs.sdk.mk (QEMU_REPO,
-# QEMU_RELEASE, QEMU_BIN for the target arch), read from output/qemu.env (written
-# by `make qemu-env` in the build job, shipped with the HDD image), or, when that
-# file is absent and an SDK is sourced, straight from `make -C pkg/sdk sdk.get-qemu`.
+# QEMU_RELEASE, QEMU_BIN for the target arch), read from $BUILDDIR/qemu.env (the
+# build output dir output.<bsp>, set by the calling job; the file is written by
+# `make qemu-env` in the build job and shipped with the HDD image), or, without
+# BUILDDIR and with an SDK sourced, straight from `make -C pkg/sdk sdk.get-qemu`.
 name: 'Setup QEMU test host'
 description: 'Install QEMU + expect, enable KVM, create tap0 for the VxWorks tests'
 
@@ -21,7 +22,11 @@ runs:
         sudo apt-get update
         sudo apt-get install -y expect uml-utilities
 
-        qemu_env="$GITHUB_WORKSPACE/output/qemu.env"
+        if [ -n "${BUILDDIR:-}" ]; then
+          qemu_env="$GITHUB_WORKSPACE/$BUILDDIR/qemu.env"
+        else
+          qemu_env="$RUNNER_TEMP/qemu.env"
+        fi
         if [ ! -f "$qemu_env" ]; then
           [ -n "${WIND_SDK_HOME:-}" ] \
             || { echo "no $qemu_env and no SDK sourced: cannot tell which QEMU to install"; exit 1; }

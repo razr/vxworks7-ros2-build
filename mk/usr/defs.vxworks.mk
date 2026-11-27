@@ -26,25 +26,33 @@ WIND_SDK_HOME ?= $(shell echo $$WIND_SDK_HOME)
 
 # Goals that need no SDK: `make toolkit` only packs build outputs. Without a
 # sourced SDK they take the SDK identity (release, arch, name) from the SDK
-# overlay in $(TOP_BUILDDIR)/sdk-overlay-build/ (made by `make sdk-overlay`).
+# overlay in <output>/sdk-overlay-build/ (made by `make sdk-overlay`), and the
+# BSP from that output dir's name (output.<bsp>). The output dir is TOP_BUILDDIR
+# when given, else the one output.<bsp> that holds an SDK overlay.
 SDK_LESS_GOALS := toolkit toolkit-info
 ifeq ($(WIND_SDK_HOME),)
 ifneq ($(MAKECMDGOALS),)
 ifeq ($(filter-out $(SDK_LESS_GOALS),$(MAKECMDGOALS)),)
-  SDK_FROM_OVERLAY := $(wildcard $(TOP_BUILDDIR)/sdk-overlay-build/sdk-overlay-*/sdk_overlay.json)
+  ifeq ($(origin TOP_BUILDDIR),file)
+    SDK_FROM_OVERLAY := $(wildcard $(CURDIR)/output.*/sdk-overlay-build/sdk-overlay-*/sdk_overlay.json)
+  else
+    SDK_FROM_OVERLAY := $(wildcard $(TOP_BUILDDIR)/sdk-overlay-build/sdk-overlay-*/sdk_overlay.json)
+  endif
   ifneq ($(words $(SDK_FROM_OVERLAY)),1)
-    $(error no SDK sourced and not exactly one SDK overlay in $(TOP_BUILDDIR)/sdk-overlay-build/ (found: $(SDK_FROM_OVERLAY)))
+    $(error no SDK sourced and not exactly one SDK overlay in output.<bsp>/sdk-overlay-build/ (found: $(SDK_FROM_OVERLAY)))
   endif
 endif
 endif
 endif
 
 ifneq ($(SDK_FROM_OVERLAY),)
+export TOP_BUILDDIR    := $(abspath $(dir $(SDK_FROM_OVERLAY))/../..)
+export TGT_BSP         := $(patsubst output.%,%,$(notdir $(TOP_BUILDDIR)))
 sdk_overlay_id = $(shell python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["sdk"][sys.argv[2]])' $(SDK_FROM_OVERLAY) $(1))
 export WIND_RELEASE_ID := $(call sdk_overlay_id,release)
 export TGT_ARCH        := $(call sdk_overlay_id,arch)
 export SDK_NAME        := $(call sdk_overlay_id,name)
-$(info SDK identity from the SDK overlay: $(WIND_RELEASE_ID) $(TGT_ARCH) $(SDK_NAME))
+$(info SDK identity from the SDK overlay: $(WIND_RELEASE_ID) $(TGT_ARCH) $(SDK_NAME), BSP $(TGT_BSP), $(TOP_BUILDDIR))
 else
 
 # WIND_SDK_HOME must be in the environment
